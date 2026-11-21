@@ -1,0 +1,80 @@
+{
+  "version": 1,
+  "dramas": [
+    {
+      "id": "25uQNfmi0328",
+      "title": "梦笔不能停",
+      "tags": [
+        "穿越",
+        "母亲",
+        "告白",
+        "父母",
+        "妈妈",
+        "闺蜜"
+      ],
+      "cover": "https://p2.img.cctvpic.com/apple3g/www/upload/image/20250328/1743125062658075152.jpg",
+      "episodes": [
+        {
+          "id": "217442759d21469997cc86df32cb9210",
+          "title": "第1集：《梦笔不能停》首更 穿越时空遇真爱",
+          "url": "https://newcntv.qcloudcdn.com/asp/hls/main/0303000a/3/default/217442759d21469997cc86df32cb9210/main.m3u8?maxbr=2048"
+        },
+        {
+          "id": "418d90f57f284061bcc3db29183a1fa8",
+          "title": "第2集：给你一支跨越时间的笔，你敢用吗",
+          "url": "https://hls.cntv.lxdns.com/asp/hls/main/0303000a/3/default/418d90f57f284061bcc3db29183a1fa8/main.m3u8?maxbr=2048"
+        },
+        {
+          "id": "6e9405ee8fab4b9e845cf80024aee80e",
+          "title": "第3集：回到80年代发现老爸在追别的女生？",
+          "url": "https://hls.cntv.lxdns.com/asp/hls/main/0303000a/3/default/6e9405ee8fab4b9e845cf80024aee80e/main.m3u8?maxbr=2048"
+        },
+        {
+          "id": "c337b64aafc34e3295591f94d09d2a00",
+          "title": "第4集：好险！穿越80年代，差点跟老爸爱上同个女生！",
+          "url": "https://newcntv.qcloudcdn.com/asp/hls/main/0303000a/3/default/c337b64aafc34e3295591f94d09d2a00/main.m3u8?maxbr=2048"
+        },
+        {
+          "id": "bfbf419845824516a6bd8b9247e25021",
+          "title": "第5集：跨越时空再见已故母亲一秒落泪！",
+          "url": "https://hls.cntv.lxdns.com/asp/hls/main/0303000a/3/default/bfbf419845824516a6bd8b9247e25021/main.m3u8?maxbr=2048"
+        },
+        {
+          "id": "f87ff816d735463bb407405c3a852294",
+          "title": "第6集：穿越回80年代，竟以这种方式参与父母爱情！",
+          "url": "https://newcntv.qcloudcdn.com/asp/hls/main/0303000a/3/default/f87ff816d735463bb407405c3a852294/main.m3u8?maxbr=2048"
+        },
+        {
+          "id": "71de5bfee11a4d09bb660614985f7bb2",
+          "title": "第7集：把你画进画里，是我最长情的告白",
+          "url": "https://hls.cntv.lxdns.com/asp/hls/main/0303000a/3/default/71de5bfee11a4d09bb660614985f7bb2/main.m3u8?maxbr=2048"
+        },
+        {
+          "id": "105b3846b2ff4b55ad1f704282ea9cbb",
+          "title": "第8集：穿越回80年代，和年轻父母double date是种什么体验？",
+          "url": "https://newcntv.qcloudcdn.com/asp/hls/main/0303000a/3/default/105b3846b2ff4b55ad1f704282ea9cbb/main.m3u8?maxbr=2048"
+        },
+        {
+          "id": "0a99e2857c9242a4977ef3ee177bc78f",
+          "title": "第9集：穿越时空，在80年代与妈妈的闺蜜甜蜜恋爱！",
+          "url": "https://newcntv.qcloudcdn.com/asp/hls/main/0303000a/3/default/0a99e2857c9242a4977ef3ee177bc78f/main.m3u8?maxbr=2048"
+        },
+        {
+          "id": "676c81b88ef646039d4e950810dffda6",
+          "title": "第10集：关键时刻退缩的男朋友你可以原谅吗？",
+          "url": "https://hls.cntv.lxdns.com/asp/hls/main/0303000a/3/default/676c81b88ef646039d4e950810dffda6/main.m3u8?maxbr=2048"
+        },
+        {
+          "id": "ad7028156e1145f28d83ecd1c71f1107",
+          "title": "第11集：不信林珊已死，程楠能否借墨笔穿越挽回遗憾？",
+          "url": "https://newcntv.qcloudcdn.com/asp/hls/main/0303000a/3/default/ad7028156e1145f28d83ecd1c71f1107/main.m3u8?maxbr=2048"
+        },
+        {
+          "id": "382be6686709480dbda0496c065dab1e",
+          "title": "第12集：程楠陪林珊再登黄山，爱情圆满收官",
+          "url": "https://hls.cntv.lxdns.com/asp/hls/main/0303000a/3/default/382be6686709480dbda0496c065dab1e/main.m3u8?maxbr=2048"
+        }
+      ]
+    }
+  ]
+}

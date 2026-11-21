@@ -1,0 +1,185 @@
+{
+  "version": 1,
+  "dramas": [
+    {
+      "id": "源起",
+      "title": "源起",
+      "tags": [
+        "廉洁文化"
+      ],
+      "cover": "https://www.gzjjjc.gov.cn/video/0/1/1499/270432_314a9e.png",
+      "episodes": [
+        {
+          "id": "270432",
+          "title": "第1集：暗涌",
+          "url": "https://gdvideo.southcn.com/1031ae6ebbcf71f180c74531859c0102/d9af3ff42e7a4aaabe53f4845bc84987-39b80c93173e40f69ce9196008227c3f-sd.mp4"
+        },
+        {
+          "id": "270433",
+          "title": "第2集：风起",
+          "url": "https://gdvideo.southcn.com/702f0829bbd071f1a5fa4531949c0102/c85b8bff362f495cb03667281543b3f0-6976aa73f4e7fda2db3302113c9f10b4-sd.mp4"
+        },
+        {
+          "id": "270434",
+          "title": "第3集：浊浪",
+          "url": "https://gdvideo.southcn.com/707e118abbd071f1adc55017f0e80102/670cefa01be14b2d89c6798ba3721424-dfc9c1ed9a0016c8795752278e371634-sd.mp4"
+        },
+        {
+          "id": "270435",
+          "title": "第4集：惊雷",
+          "url": "https://gdvideo.southcn.com/d0e6bde7bbd071f1819ff6e6e55b0102/b61a7be9c3184e92ae31afd63cbfaa40-81da0f12b4a10fd2769613ca10b857be-sd.mp4"
+        },
+        {
+          "id": "270436",
+          "title": "第5集：焚心",
+          "url": "https://gdvideo.southcn.com/f0b6bc3ebbd171f18226e7f6c5490102/04c090e143a7420aac427bc8d5d302c0-a2cac5749905bbac8cfed1239b00bf9e-sd.mp4"
+        },
+        {
+          "id": "270437",
+          "title": "第6集：对质",
+          "url": "https://gdvideo.southcn.com/c032a8debbd171f18239e6e7c5780102/0aad2ccf627548ebb5c527a0c9e95212-a9a6e7bc4ef67910d29e3790eb32201c-sd.mp4"
+        }
+      ]
+    },
+    {
+      "id": "我那帅气的老祖宗",
+      "title": "我那帅气的老祖宗",
+      "tags": [
+        "廉洁文化"
+      ],
+      "cover": "https://www.gzjjjc.gov.cn/video/0/1/1329/262182_ab4ef5.png",
+      "episodes": [
+        {
+          "id": "262182",
+          "title": "第一集",
+          "url": "https://gdvideo.southcn.com/b0e2f49d7e5f71f0bfb35420848d0102/9b5795860fca4ecdb16a951203d26a49-e3a9bf25a9316fc93ef22a975e1e3660-sd.mp4"
+        },
+        {
+          "id": "262183",
+          "title": "第二集",
+          "url": "https://gdvideo.southcn.com/e061c12a7be171f083b55107e0c90102/fdb81cf3153f45d68bb60d01c3d2501d-f96607617175b087609c11491b25f1a2-sd.mp4"
+        },
+        {
+          "id": "262184",
+          "title": "第三集",
+          "url": "https://gdvideo.southcn.com/205244907be171f0914d4531959c0102/6d0b398883af428c875ea820c4bbcca5-8d66d23876bc2b44167d527245310073-sd.mp4"
+        },
+        {
+          "id": "262185",
+          "title": "第四集",
+          "url": "https://gdvideo.southcn.com/b0063c717be271f0bfc34531948c0102/e54e35b81f774dbc8c08e6a6ee72d4b1-4cdc412a79a50e77b240e95cb8917500-sd.mp4"
+        },
+        {
+          "id": "262186",
+          "title": "第五集",
+          "url": "https://gdvideo.southcn.com/c0ce03357be371f08fe06633b79f0102/ad478e2bd720454a911a81453c911688-1406dca2af94e6c8d84c2e28e1e10484-sd.mp4"
+        }
+      ]
+    },
+    {
+      "id": "账单",
+      "title": "账单",
+      "tags": [
+        "廉洁文化"
+      ],
+      "cover": "https://www.gzjjjc.gov.cn/video/0/1/1313/262187_b1e0bf.png",
+      "episodes": [
+        {
+          "id": "262187",
+          "title": "账单",
+          "url": "https://gdvideo.southcn.com/60bcdddb7be371f08a785017f0f90102/235278c0e25143f79542cad8dd1bb1a3-76c3bd0b43beebf7f6965b35feda484f-sd.mp4"
+        }
+      ]
+    },
+    {
+      "id": "穿越2000年的答案",
+      "title": "穿越2000年的答案",
+      "tags": [
+        "廉洁文化"
+      ],
+      "cover": "https://www.gzjjjc.gov.cn/video/0/1/1314/262188_f2f156.jpeg",
+      "episodes": [
+        {
+          "id": "262188",
+          "title": "第一集",
+          "url": "https://gdvideo.southcn.com/5078b6417be571f0beb05017f1e90102/d175d107962849c296d697534c6f0946-d86d2e738acf9a2496d5fcd14bc058a8-sd.mp4"
+        },
+        {
+          "id": "262189",
+          "title": "第二集",
+          "url": "https://gdvideo.southcn.com/b0e446e97be571f0bff06732b68f0102/74076468a7404d0c8934076dabc3513e-86572d372f37b40fcd888724a541c2d2-sd.mp4"
+        },
+        {
+          "id": "262190",
+          "title": "第三集",
+          "url": "https://gdvideo.southcn.com/40fccda57be671f0a39f5017e1e90102/d33d02d352404c4483950cd286432efa-059ac3745e73f50d52dd022d45c566fa-sd.mp4"
+        }
+      ]
+    },
+    {
+      "id": "金粉沾手不沾心",
+      "title": "金粉沾手不沾心",
+      "tags": [
+        "廉洁文化"
+      ],
+      "cover": "https://www.gzjjjc.gov.cn/video/0/1/1317/262191_230848.jpeg",
+      "episodes": [
+        {
+          "id": "262191",
+          "title": "金粉沾手不沾心",
+          "url": "https://gdvideo.southcn.com/90cdd7397bfa71f0801d5017e1f90102/9dede7201b7b41e4b319bc5fac0cf0c3-50de1af7e602e7d3ebced4dde122bf61-sd.mp4"
+        }
+      ]
+    },
+    {
+      "id": "渔·镰",
+      "title": "渔·镰",
+      "tags": [
+        "廉洁文化"
+      ],
+      "cover": "https://www.gzjjjc.gov.cn/video/0/1/1318/262192_82d5a7.jpeg",
+      "episodes": [
+        {
+          "id": "262192",
+          "title": "渔·镰",
+          "url": "https://gdvideo.southcn.com/80971a877bfb71f0bda44531959d0102/23e93ff9ffe1409d9a5c257d67ecddf9-37b40a5de6eab4ed49eb6a42754a8c88-sd.mp4"
+        }
+      ]
+    },
+    {
+      "id": "容错纠错——BUG启示录",
+      "title": "容错纠错——BUG启示录",
+      "tags": [
+        "廉洁文化"
+      ],
+      "cover": "https://www.gzjjjc.gov.cn/video/0/1/1319/262195_e96f76.jpeg",
+      "episodes": [
+        {
+          "id": "262195",
+          "title": "第一集",
+          "url": "https://gdvideo.southcn.com/209885e57bff71f0801d5017e1f90102/1c36a72b521448e1bae86211e295ec3a-1449816331aa6c2b10fc5f0868fbee59-sd.mp4"
+        },
+        {
+          "id": "262196",
+          "title": "第二集",
+          "url": "https://gdvideo.southcn.com/9032846b7c0271f0914f4531959c0102/cbd94ec18b124e9ca8dd4bdf0cb19070-d7d64302dfd6ed7ace7fe1b6804c54af-sd.mp4"
+        }
+      ]
+    },
+    {
+      "id": "酱心",
+      "title": "酱心",
+      "tags": [
+        "廉洁文化"
+      ],
+      "cover": "https://www.gzjjjc.gov.cn/video/0/1/1327/262216_cb8ab1.jpeg",
+      "episodes": [
+        {
+          "id": "262216",
+          "title": "第一集",
+          "url": "https://gdvideo.southcn.com/2098383b7d9171f095126733a68f0102/68968358a0f341ce91b5294d9b7a9d05-9f4d4abe2654531459a6f8ce9491fb55-sd.mp4"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,50 @@
+name: sableen
+description: 简繁中文短剧播放器
+publish_to: none
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.13.7
+  flutter: ">=3.47.0"
+  
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  material_ui: ^1.11.1
+  dynamic_color: ^2.1.0
+  rust_lib_sableen:
+    path: rust_builder
+  flutter_rust_bridge: 2.13.0
+  media_kit: ^1.2.6
+  media_kit_video: ^2.0.1
+  media_kit_libs_video: ^1.0.7
+  shared_preferences: ^2.5.6
+  http: ^1.6.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  integration_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/catalogs/
+    - assets/posters/
+  shaders:
+    - shaders/capsule.frag
+  fonts:
+    - family: GoogleSans
+      fonts:
+        - asset: assets/fonts/GoogleSans-Variable.ttf
+    - family: HarmonyOSSans
+      fonts:
+        - asset: assets/fonts/HarmonyOS_SansSC_Regular.ttf
+          weight: 400
+        - asset: assets/fonts/HarmonyOS_SansSC_Medium.ttf
+          weight: 500
+        - asset: assets/fonts/HarmonyOS_SansSC_Bold.ttf
+          weight: 700
