@@ -4,7 +4,7 @@
 #
 Pod::Spec.new do |s|
   s.name             = 'rust_lib_sableen'
-  s.version          = '0.0.1'
+  s.version          = '1.0.1'
   s.summary          = 'Rust catalog, watch history and recommendations for Sableen.'
   s.homepage         = 'https://github.com/blueokanna/Sableen'
   s.license          = { :type => 'PolyForm Noncommercial 1.0.0', :file => '../../LICENSE' }

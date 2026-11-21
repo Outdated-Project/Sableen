@@ -145,14 +145,19 @@ fn short_previews_supply_less_evidence_than_sustained_viewing() {
 fn bundled_catalogs_have_unique_ids_and_valid_media() {
     let mut ids = std::collections::HashSet::new();
     for data in [
-        include_bytes!("../../assets/catalogs/guangzhou.json").as_slice(),
         include_bytes!("../../assets/catalogs/hongguo.json").as_slice(),
-        include_bytes!("../../assets/catalogs/cctv.json").as_slice(),
+        include_bytes!("../../assets/catalogs/comic.json").as_slice(),
     ] {
         let titles = parse_catalog(data.to_vec()).unwrap();
         assert!(!titles.is_empty());
         for drama in titles {
             assert!(ids.insert(drama.id));
+            for episode in drama.episodes {
+                assert!(episode.url.starts_with(&format!(
+                    "https://hongguoduanju.com/video/public/{}/",
+                    episode.id
+                )));
+            }
         }
     }
 }

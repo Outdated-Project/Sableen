@@ -6,9 +6,11 @@ import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'design.dart';
 import 'library.dart';
+import 'playback_window.dart';
 import 'src/rust/api/library.dart';
 
 bool _acceleratedTexture = true;
@@ -52,6 +54,9 @@ class _TheaterState extends State<Theater> with WidgetsBindingObserver {
   int watched = 0, previous = 0, lastWrite = 0;
   bool opening = true, failed = false, closed = false, completed = false;
   bool background = false, seeking = false;
+  bool showControls = true, smallWindow = false, supportsPip = false;
+  Timer? hideControls;
+  int visibilityChange = 0;
   double? dragging;
   double requested = 0;
   int? skippedBreak;
@@ -61,6 +66,21 @@ class _TheaterState extends State<Theater> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    if (androidVideo) {
+      displayChannel.setMethodCallHandler((call) async {
+        if (call.method == 'pipChanged' && !closed) {
+          smallWindow = call.arguments == true;
+          didChangeAppLifecycleState(
+            WidgetsBinding.instance.lifecycleState ?? AppLifecycleState.resumed,
+          );
+          _update();
+        }
+      });
+      displayChannel.invokeMethod<bool>('supportsPip').then((value) {
+        supportsPip = value == true;
+        _update();
+      });
+    }
     final lifecycle = WidgetsBinding.instance.lifecycleState;
     background =
         lifecycle == AppLifecycleState.paused ||
@@ -87,6 +107,7 @@ class _TheaterState extends State<Theater> with WidgetsBindingObserver {
         _update();
       }),
       player.stream.playing.listen((playing) {
+        _scheduleControls(playing);
         _resetEvidence();
         _cadence();
         if (!playing && !opening) _save();
@@ -119,6 +140,36 @@ class _TheaterState extends State<Theater> with WidgetsBindingObserver {
 
   void _update() {
     if (mounted && !closed) setState(() {});
+  }
+
+  void _scheduleControls(bool playing) {
+    if (closed) return;
+    hideControls?.cancel();
+    if (!playing || MediaQuery.accessibleNavigationOf(context)) {
+      showControls = true;
+    } else {
+      hideControls = Timer(const Duration(seconds: 3), () {
+        if (!closed && dragging == null && !failed && !opening) {
+          setState(() => showControls = false);
+        }
+      });
+    }
+  }
+
+  void _reveal() {
+    final hidden = !showControls;
+    _scheduleControls(player.state.playing);
+    if (hidden) setState(() => showControls = true);
+  }
+
+  void _togglePlaying() {
+    if (opening || closed || background) return;
+    _reveal();
+    if (completed || failed) {
+      unawaited(_open(index));
+    } else {
+      unawaited(player.playOrPause());
+    }
   }
 
   Future<void> _open(int next) async {
@@ -302,23 +353,34 @@ class _TheaterState extends State<Theater> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused ||
-        state == AppLifecycleState.hidden ||
-        state == AppLifecycleState.detached) {
-      background = true;
-      _resetEvidence();
-      _cadence();
-      unawaited(player.pause());
-      _save();
-    } else if (state == AppLifecycleState.resumed) {
+    final revision = ++visibilityChange;
+    if (state == AppLifecycleState.resumed ||
+        state == AppLifecycleState.inactive) {
       background = false;
       _cadence();
+      return;
+    }
+    unawaited(_checkVisibility(state, revision));
+  }
+
+  Future<void> _checkVisibility(AppLifecycleState state, int revision) async {
+    final visible =
+        state != AppLifecycleState.detached && await videoInSmallWindow();
+    if (closed || visibilityChange != revision) return;
+    background = !visible;
+    _resetEvidence();
+    _cadence();
+    if (background) {
+      await player.pause();
+      if (!closed) _save();
     }
   }
 
   @override
   void dispose() {
     closed = true;
+    hideControls?.cancel();
+    if (androidVideo) displayChannel.setMethodCallHandler(null);
     _cadence();
     _save();
     elapsed.stop();
@@ -333,46 +395,19 @@ class _TheaterState extends State<Theater> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    final c = Theme.of(context).colorScheme;
-    final frame = ColoredBox(
-      color: Colors.black,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          Video(
-            controller: video,
-            controls: null,
-            pauseUponEnteringBackgroundMode: false,
-            subtitleViewConfiguration: const SubtitleViewConfiguration(
-              visible: false,
-            ),
-          ),
-          if (opening || player.state.buffering)
-            const Center(child: CircularProgressIndicator()),
-          if (failed)
-            Center(
-              child: ElevatedButton.icon(
-                onPressed: opening ? null : () => _open(index),
-                icon: const Icon(Icons.refresh_rounded),
-                label: Text(context.zh('播放失败，重试', '播放失敗，重試')),
-              ),
-            ),
-        ],
+    final surface = Video(
+      controller: video,
+      controls: null,
+      pauseUponEnteringBackgroundMode: false,
+      subtitleViewConfiguration: const SubtitleViewConfiguration(
+        visible: false,
       ),
     );
     final controls = Row(
       children: [
         IconButton.filled(
           tooltip: player.state.playing ? context.zh('暂停', '暫停') : '播放',
-          onPressed: opening
-              ? null
-              : () {
-                  if (completed || failed) {
-                    _open(index);
-                  } else {
-                    player.playOrPause();
-                  }
-                },
+          onPressed: opening ? null : _togglePlaying,
           icon: Icon(
             player.state.playing
                 ? Icons.pause_rounded
@@ -403,6 +438,7 @@ class _TheaterState extends State<Theater> with WidgetsBindingObserver {
                             },
                       onChangeEnd: (v) {
                         dragging = null;
+                        _reveal();
                         unawaited(_seek(v.round()));
                       },
                     ),
@@ -415,61 +451,178 @@ class _TheaterState extends State<Theater> with WidgetsBindingObserver {
         ),
       ],
     );
-    final list = ListView.builder(
-      itemCount: widget.drama.episodes.length,
-      itemBuilder: (context, i) => ListTile(
-        selected: i == index,
-        selectedTileColor: c.secondaryContainer,
-        title: Text(widget.drama.episodes[i].title),
-        leading: Icon(
-          i == index
-              ? Icons.play_circle_fill_rounded
-              : Icons.play_circle_outline_rounded,
-        ),
-        onTap: opening || seeking || (i == index && !failed)
-            ? null
-            : () => _open(i),
-      ),
-    );
     return Scaffold(
-      appBar: AppBar(title: Text(widget.drama.title)),
-      body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, box) {
-            final wide =
-                box.maxWidth >= 780 ||
-                (box.maxWidth > box.maxHeight * 1.6 && box.maxHeight < 420);
-            final stage = Column(
-              children: [
-                Expanded(child: frame),
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 4,
+      backgroundColor: Colors.black,
+      body: MouseRegion(
+        onHover: (_) => _reveal(),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            surface,
+            if (!smallWindow) ...[
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                excludeFromSemantics: true,
+                onTap: _reveal,
+              ),
+              Center(
+                child: FractionallySizedBox(
+                  widthFactor: .45,
+                  heightFactor: .45,
+                  child: GestureDetector(
+                    key: const ValueKey('center-playback'),
+                    behavior: HitTestBehavior.opaque,
+                    onTap: _togglePlaying,
+                    child: Semantics(
+                      button: true,
+                      label: player.state.playing
+                          ? context.zh('暂停', '暫停')
+                          : '播放',
+                    ),
                   ),
-                  child: controls,
                 ),
-              ],
-            );
-            return wide
-                ? Row(
-                    children: [
-                      Expanded(child: stage),
-                      SizedBox(
-                        width: (box.maxWidth * .28).clamp(180, 340),
-                        child: list,
-                      ),
-                    ],
-                  )
-                : Column(
-                    children: [
-                      Expanded(flex: 3, child: stage),
-                      Expanded(child: list),
-                    ],
-                  );
-          },
+              ),
+              if (opening || player.state.buffering)
+                const IgnorePointer(
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+              if (failed)
+                Center(
+                  child: FilledButton.tonalIcon(
+                    onPressed: opening ? null : () => _open(index),
+                    icon: const Icon(Icons.refresh_rounded),
+                    label: Text(context.zh('播放失败，重试', '播放失敗，重試')),
+                  ),
+                ),
+              if (showControls || failed)
+                SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: Column(
+                      children: [
+                        Row(
+                          children: [
+                            IconButton.filledTonal(
+                              tooltip: MaterialLocalizations.of(context)
+                                  .backButtonTooltip,
+                              onPressed: () => Navigator.maybePop(context),
+                              icon: const Icon(Icons.arrow_back_rounded),
+                            ),
+                            const Spacer(),
+                            if (supportsPip)
+                              IconButton.filledTonal(
+                                tooltip: context.zh('小窗播放', '小窗播放'),
+                                onPressed: () async {
+                                  final w = player.state.width ?? 0,
+                                      h = player.state.height ?? 0;
+                                  final ok = await displayChannel
+                                      .invokeMethod<bool>(
+                                        'enterPip',
+                                        w > 0 && h > 0 ? w / h : 1.0,
+                                      );
+                                  if (context.mounted && ok != true) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          context.zh('系统未开启小窗', '系統未開啟小窗'),
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                },
+                                icon: const Icon(
+                                  Icons.picture_in_picture_alt_rounded,
+                                ),
+                              ),
+                            IconButton.filledTonal(
+                              tooltip: context.zh('打开红果官方播放页', '開啟紅果官方播放頁'),
+                              onPressed: () async {
+                                final uri = Uri.https(
+                                  'hongguoduanju.com',
+                                  '/player/${widget.drama.id}${index == 0 ? '' : '/${episode.id}'}',
+                                );
+                                final ok = await launchUrl(
+                                  uri,
+                                  mode: LaunchMode.externalApplication,
+                                );
+                                if (context.mounted && !ok) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: SelectableText(uri.toString()),
+                                    ),
+                                  );
+                                }
+                              },
+                              icon: const Icon(Icons.open_in_new_rounded),
+                            ),
+                          ],
+                        ),
+                        const Spacer(),
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 720),
+                          child: Card.filled(
+                            child: Padding(
+                              padding: const EdgeInsets.fromLTRB(12, 8, 16, 6),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          '${widget.drama.title} · ${episode.title}',
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .titleSmall,
+                                        ),
+                                      ),
+                                      if (widget.drama.episodes.length > 1)
+                                        IconButton(
+                                          tooltip: context.zh('选集', '選集'),
+                                          icon: const Icon(
+                                            Icons.video_library_outlined,
+                                          ),
+                                          onPressed: opening || seeking
+                                              ? null
+                                              : _selectEpisode,
+                                        ),
+                                    ],
+                                  ),
+                                  controls,
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ],
         ),
       ),
     );
+  }
+
+  Future<void> _selectEpisode() async {
+    final episodes = widget.drama.episodes;
+    final selected = await showModalBottomSheet<int>(
+      context: context,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (context) => ListView.builder(
+        shrinkWrap: true,
+        itemCount: episodes.length,
+        itemBuilder: (context, i) => ListTile(
+          selected: i == index,
+          title: Text(episodes[i].title),
+          onTap: () => Navigator.pop(context, i),
+        ),
+      ),
+    );
+    if (!closed && selected != null && selected != index) await _open(selected);
   }
 }

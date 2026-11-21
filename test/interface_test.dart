@@ -40,7 +40,9 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
-        expect(find.text('新增你的第一部短劇'), findsOneWidget);
+        expect(find.text('紅果短劇'), findsOneWidget);
+        expect(find.text('紅果漫劇'), findsOneWidget);
+        expect(find.text('沒有符合的劇目'), findsOneWidget);
         await tester.tap(find.text('歷史'));
         await tester.pumpAndSettle();
         expect(find.text('還沒有觀看紀錄'), findsOneWidget);

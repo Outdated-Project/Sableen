@@ -41,11 +41,7 @@ class _SableenState extends State<Sableen> {
       }
       await initializePlayback();
       await prefs.restore();
-      try {
-        await library.restore();
-      } catch (_) {
-        library.sourceFailed = true;
-      }
+      await library.restore();
       if (mounted) setState(() => ready = true);
     } catch (_) {
       if (mounted) setState(() => failed = true);

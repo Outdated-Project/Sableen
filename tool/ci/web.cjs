@@ -29,7 +29,8 @@ async function test() {
     page.on('response', res => { if (res.status() >= 400) console.error('HTTP', res.status(), new URL(res.url()).hostname); });
     await page.goto(`http://127.0.0.1:${server.address().port}`);
     await page.locator('flt-semantics-placeholder').dispatchEvent('click');
-    const titles = [['央视频剧场', '梦笔不能停'], ['广州微短剧', '源起'], ['红果片段', '做兄弟，在心中']];
+    const titles = [['红果短剧', 'hongguo'], ['红果漫剧', 'comic']].map(([label, file]) =>
+      [label, JSON.parse(fs.readFileSync(path.join(root, 'assets/assets/catalogs', file + '.json'), 'utf8')).dramas[0].title]);
     for (const [publisher, title] of titles) {
       console.log('Testing', publisher, title);
       await page.getByRole('checkbox', { name: publisher }).press('Space');
@@ -38,13 +39,15 @@ async function test() {
         const video = document.querySelector('video');
         return video?.currentTime >= 1 && video.videoWidth > 0;
       }, null, { timeout: 45000 });
-      if (title === '梦笔不能停') {
-        await page.locator('video').first().evaluate(v => { v.currentTime = 30; });
-        await page.waitForFunction(() => document.querySelector('video')?.currentTime >= 31);
+      if (publisher === '红果短剧') {
+        await page.locator('video').first().evaluate(v => { v.currentTime = v.duration * .45; });
+        await page.waitForFunction(() => { const v = document.querySelector('video'); return v?.currentTime >= v?.duration * .5; });
+        await page.mouse.move(60, 60);
         await page.getByRole('button', { name: '返回', exact: true }).first().evaluate(el => el.click());
         await page.getByRole('button', { name: new RegExp(title) }).first().press('Enter');
-        await page.waitForFunction(() => document.querySelector('video')?.currentTime >= 30, null, { timeout: 18000 });
+        await page.waitForFunction(() => { const v = document.querySelector('video'); return v?.currentTime >= v?.duration * .45; }, null, { timeout: 4500 });
       }
+      await page.mouse.move(70, 70);
       await page.getByRole('button', { name: '返回', exact: true }).first().evaluate(el => el.click());
       await page.getByRole('tab', { name: '历史' }).waitFor();
     }

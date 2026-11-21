@@ -1,45 +1,55 @@
+"""Verify the bundled Hongguo media against its public player metadata."""
+import argparse
+from concurrent.futures import ThreadPoolExecutor
 import json
-import subprocess
+import re
+import sys
 from pathlib import Path
-from urllib.parse import urljoin, urlsplit
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from refresh_catalogs import HONGGUO, RANKS, ROOT, duration, publication
 
 
-def fetch(url, limit):
-    response = subprocess.run(['curl', '--fail', '--show-error', '--silent', '--location',
-                               '--proto', '=https', '--proto-redir', '=https', '--retry', '2',
-                               '--connect-timeout', '10', '--max-time', '35', '--range', f'0-{limit - 1}', url],
-                              check=True, capture_output=True)
-    if not response.stdout:
-        raise ValueError('Empty media response')
-    return response.stdout
+def check(record):
+    series, episode = record
+    page = episode['page']
+    if not re.fullmatch(re.escape(HONGGUO) + rf'/player/{re.escape(series)}(?:/{re.escape(episode["id"])})?', page):
+        raise ValueError('Invalid player page')
+    media = episode['url']
+    if not re.fullmatch(re.escape(HONGGUO) + rf'/video/public/{re.escape(episode["id"])}/\d+p\.mp4', media):
+        raise ValueError(f'Unexpected media origin on {page}')
+    video = next(n for n in publication(page).nodes if n.get('@type') == 'VideoObject'
+                 and n.get('url') == page and n.get('contentUrl') == media and n.get('about', {}).get('@id') == page + '#episode')
+    declared = re.fullmatch(r'PT(?:(\d+)H)?(?:(\d+)M)?(?:([\d.]+)S)?', video.get('duration', ''))
+    listed = round(1000 * sum(float(n or 0) * unit for n, unit in zip(declared.groups(), (3600, 60, 1)))) if declared else 0
+    measured = round(duration(media) * 1000)
+    if abs(measured - episode['durationMs']) > 250 or listed != episode['listedMs']:
+        raise ValueError(f'Media duration changed on {page}')
+    full = listed > 0 and abs(listed - measured) <= 1000
+    if ('片段' in episode['title']) == full:
+        raise ValueError(f'Incorrect preview label on {page}')
+    return full
 
 
 def main():
-    errors = []
-    for path in sorted(Path('assets/catalogs').glob('*.json')):
-        item = json.loads(path.read_text(encoding='utf-8'))['dramas'][0]['episodes'][0]
-        url = item['url']
-        try:
-            for depth in range(4):
-                data = fetch(url, 8192)
-                if depth == 0 and urlsplit(url).path.endswith('.mp4'):
-                    if data[4:8] != b'ftyp':
-                        raise ValueError('Expected an MP4 header')
-                    break
-                if not data.startswith(b'#EXTM3U'):
-                    if depth == 0 or not (data.startswith(b'\x47') or data[4:8] in (b'ftyp', b'styp', b'moof') or data.startswith(b'ID3')):
-                        raise ValueError('Expected an HLS playlist or video segment')
-                    break
-                line = next(line for line in data.decode().splitlines() if line and not line.startswith('#'))
-                url = urljoin(url, line.strip())
-            else:
-                raise ValueError('HLS playlist did not resolve to media')
-            print(path.stem, 'media reachable', flush=True)
-        except (ValueError, StopIteration, subprocess.CalledProcessError) as error:
-            reason = error.stderr.decode(errors='replace') if isinstance(error, subprocess.CalledProcessError) else str(error)
-            errors.append(f'{path.stem} ({urlsplit(url).hostname}): {reason}')
-    if errors:
-        raise SystemExit('\n'.join(errors))
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--require-episodes', action='store_true')
+    args = parser.parse_args()
+    if {p.stem for p in ROOT.glob('*.json')} != set(RANKS):
+        raise ValueError('Unexpected bundled catalogs')
+    missing = []
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        for category in RANKS:
+            dramas = json.loads((ROOT / f'{category}.json').read_bytes())['dramas']
+            records = [(d['id'], e) for d in dramas for e in d['episodes']]
+            if not records:
+                raise ValueError(f'{category} has no media')
+            full = sum(pool.map(check, records))
+            print(f'{category}: {len(records)} verified, {full} duration-matched episodes', flush=True)
+            if not full:
+                missing.append(category)
+    if args.require_episodes and missing:
+        raise SystemExit('Full Hongguo episodes unavailable in: ' + ', '.join(missing))
 
 
 if __name__ == '__main__':

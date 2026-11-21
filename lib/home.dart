@@ -1,10 +1,12 @@
+import 'dart:async';
+
 import 'package:material_ui/material_ui.dart';
 
 import 'design.dart';
 import 'library.dart';
 import 'playback.dart';
+import 'playback_window.dart';
 import 'preferences.dart';
-import 'source_page.dart';
 import 'src/rust/api/library.dart';
 
 class Home extends StatefulWidget {
@@ -41,21 +43,6 @@ class _HomeState extends State<Home> {
     super.dispose();
   }
 
-  Future<void> _source() async {
-    final ok = await Navigator.push<bool>(
-      context,
-      MaterialPageRoute(builder: (_) => SourcePage(library)),
-    );
-    if (ok == true && mounted) {
-      setState(() {
-        tab = 0;
-        query = '';
-        publisher = null;
-        search.clear();
-      });
-    }
-  }
-
   Future<void> _watch(Drama d) async {
     final last = library.latest(d.id);
     var i = d.episodes.indexWhere((e) => e.id == last?.episode);
@@ -64,12 +51,14 @@ class _HomeState extends State<Home> {
     } else if (last!.completed && i + 1 < d.episodes.length) {
       i++;
     }
+    unawaited(setTheaterFullscreen(true));
     await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => Theater(library: library, drama: d, initial: i),
       ),
     );
+    await setTheaterFullscreen(false);
     if (mounted && tab == 1) _select(1);
   }
 
@@ -174,11 +163,6 @@ class _HomeState extends State<Home> {
                                       ),
                                     ),
                                     IconButton(
-                                      tooltip: context.zh('添加片源', '新增片源'),
-                                      onPressed: _source,
-                                      icon: const Icon(Icons.add_rounded),
-                                    ),
-                                    IconButton(
                                       tooltip: context.zh('设置', '設定'),
                                       onPressed: () => Navigator.push(
                                         context,
@@ -272,7 +256,7 @@ class _HomeState extends State<Home> {
                                   ),
                                 ),
                               ),
-                            if (tab == 0 && library.source == publicCatalog)
+                            if (tab == 0)
                               SliverPadding(
                                 padding: EdgeInsets.fromLTRB(
                                   inset,
@@ -288,16 +272,12 @@ class _HomeState extends State<Home> {
                                           in <(Publisher?, String)>[
                                             (null, '全部'),
                                             (
-                                              Publisher.cctv,
-                                              context.zh('央视频剧场', '央視頻劇場'),
-                                            ),
-                                            (
-                                              Publisher.guangzhou,
-                                              context.zh('广州微短剧', '廣州微短劇'),
-                                            ),
-                                            (
                                               Publisher.hongguo,
-                                              context.zh('红果片段', '紅果片段'),
+                                              context.zh('红果短剧', '紅果短劇'),
+                                            ),
+                                            (
+                                              Publisher.comic,
+                                              context.zh('红果漫剧', '紅果漫劇'),
                                             ),
                                           ])
                                         ChoiceChip(
@@ -380,14 +360,8 @@ class _HomeState extends State<Home> {
     double width,
   ) {
     if (dramas.isEmpty) {
-      final emptySource = library.dramas.isEmpty;
       final text = switch (tab) {
-        0 =>
-          library.sourceFailed
-              ? context.zh('剧单读取失败', '劇單讀取失敗')
-              : emptySource
-              ? context.zh('添加你的第一部短剧', '新增你的第一部短劇')
-              : context.zh('没有匹配的剧目', '沒有符合的劇目'),
+        0 => context.zh('没有匹配的剧目', '沒有符合的劇目'),
         1 => context.zh('暂无可推荐的剧目', '暫無可推薦的劇目'),
         _ => context.zh('还没有观看记录', '還沒有觀看紀錄'),
       };
@@ -428,14 +402,6 @@ class _HomeState extends State<Home> {
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
-                  if (emptySource) ...[
-                    const SizedBox(height: 16),
-                    ElevatedButton.icon(
-                      onPressed: _source,
-                      icon: const Icon(Icons.add_rounded),
-                      label: Text(context.zh('添加片源', '新增片源')),
-                    ),
-                  ],
                 ],
               ),
             ),
@@ -466,10 +432,7 @@ class _HomeState extends State<Home> {
           ][i % 4];
           final single = d.episodes.singleOrNull;
           final origin = library.publishers[d.id];
-          final availability =
-              library.publishers[d.id] == Publisher.hongguo && single != null
-              ? single.title
-              : '${d.episodes.length} 集';
+          final availability = single?.title ?? '${d.episodes.length} 集';
           Widget fallback() => ColoredBox(
             color: c.secondaryContainer,
             child: Center(
@@ -485,22 +448,12 @@ class _HomeState extends State<Home> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Expanded(
-                    child: origin != null
-                        ? Image.asset(
-                            'assets/posters/${origin.name}-${d.episodes.first.id}.webp',
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, _, _) => fallback(),
-                          )
-                        : d.cover == null
-                        ? fallback()
-                        : Image.network(
-                            d.cover!,
-                            fit: BoxFit.cover,
-                            cacheWidth: 600,
-                            webHtmlElementStrategy:
-                                WebHtmlElementStrategy.fallback,
-                            errorBuilder: (_, _, _) => fallback(),
-                          ),
+                    child: Image.asset(
+                      'assets/posters/${origin!.name}-${d.episodes.first.id}.webp',
+                      fit: BoxFit.cover,
+                      cacheWidth: 560,
+                      errorBuilder: (_, _, _) => fallback(),
+                    ),
                   ),
                   Padding(
                     padding: const EdgeInsets.all(14),

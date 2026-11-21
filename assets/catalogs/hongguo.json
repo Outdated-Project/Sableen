@@ -2,128 +2,23 @@
   "version": 1,
   "dramas": [
     {
-      "id": "7706461625842142232",
-      "title": "做兄弟，在心中",
-      "tags": [
-        "都市",
-        "友情岁月",
-        "故人重逢",
-        "隐藏大佬"
-      ],
-      "cover": "https://p6-novel.byteimg.com/novel-pic/f01cba40a710db08f5abfad54bd3209a~tplv-shrink:640:0.image",
-      "episodes": [
-        {
-          "id": "7706463565590301721",
-          "title": "第1集 · 10 秒片段",
-          "url": "https://hongguoduanju.com/video/public/7706463565590301721/360p.mp4"
-        }
-      ]
-    },
-    {
-      "id": "7708056003006188569",
-      "title": "重回诊出喜脉那日，我不忍了",
-      "tags": [
-        "古装",
-        "重生逆袭",
-        "圆满结局",
-        "大女主"
-      ],
-      "cover": "https://p6-novel.byteimg.com/novel-pic/bc8d9b135dac5de2cb51705f9e83347b~tplv-shrink:640:0.image",
-      "episodes": [
-        {
-          "id": "7708058886430788633",
-          "title": "第1集 · 10 秒片段",
-          "url": "https://hongguoduanju.com/video/public/7708058886430788633/360p.mp4"
-        }
-      ]
-    },
-    {
-      "id": "7590282854509071384",
-      "title": "绑定系统后我成了校草",
-      "tags": [
-        "都市",
-        "逆袭翻身",
-        "打脸反派",
-        "系统"
-      ],
-      "cover": "https://p3-novel.byteimg.com/novel-pic/8e3054465953399b699c8b595ca061b3~tplv-shrink:640:0.image",
-      "episodes": [
-        {
-          "id": "7590285834020981822",
-          "title": "第1集 · 10 秒片段",
-          "url": "https://hongguoduanju.com/video/public/7590285834020981822/360p.mp4"
-        }
-      ]
-    },
-    {
-      "id": "7706908220253555737",
-      "title": "得了一种只能说真话的病",
-      "tags": [
-        "悬疑",
-        "奇幻脑洞",
-        "异能",
-        "现代"
-      ],
-      "cover": "https://p6-novel.byteimg.com/novel-pic/4427f6d48c56e3b0f854b67f434064f5~tplv-shrink:640:0.image",
-      "episodes": [
-        {
-          "id": "7706910230088518718",
-          "title": "第1集 · 10 秒片段",
-          "url": "https://hongguoduanju.com/video/public/7706910230088518718/360p.mp4"
-        }
-      ]
-    },
-    {
-      "id": "7709467672764763198",
-      "title": "杀神扮兄，护嫂安宁",
-      "tags": [
-        "都市",
-        "超凡逆袭",
-        "隐藏大佬",
-        "打脸反派"
-      ],
-      "cover": "https://p6-novel.byteimg.com/novel-pic/e0dfb3c120e3133d86014a3049e85450~tplv-shrink:640:0.image",
-      "episodes": [
-        {
-          "id": "7709469495319858238",
-          "title": "第1集 · 10 秒片段",
-          "url": "https://hongguoduanju.com/video/public/7709469495319858238/360p.mp4"
-        }
-      ]
-    },
-    {
-      "id": "7706059617473678361",
-      "title": "散了，也安生了",
+      "id": "7706512650816982040",
+      "title": "少夫人来自东北3",
       "tags": [
         "家庭",
-        "家庭伦理",
-        "矛盾和解",
-        "大男主"
+        "家庭温情",
+        "团宠",
+        "直爽女主"
       ],
-      "cover": "https://p6-novel.byteimg.com/novel-pic/a7c6d138d98a4d387b2c465d2ec5927a~tplv-shrink:640:0.image",
+      "cover": "https://p3-novel.byteimg.com/novel-pic/899ba52ee34a534d9be948a093468ed1~tplv-shrink:640:0.image",
       "episodes": [
         {
-          "id": "7706061583725628441",
+          "id": "7706514645208534041",
           "title": "第1集 · 10 秒片段",
-          "url": "https://hongguoduanju.com/video/public/7706061583725628441/360p.mp4"
-        }
-      ]
-    },
-    {
-      "id": "7706004220599618584",
-      "title": "错失的遗憾",
-      "tags": [
-        "家庭",
-        "婚姻经营",
-        "后悔流",
-        "现代"
-      ],
-      "cover": "https://p3-novel.byteimg.com/novel-pic/263a36941b6075493785aeff4a2c14c8~tplv-shrink:640:0.image",
-      "episodes": [
-        {
-          "id": "7706006636074126361",
-          "title": "第1集 · 10 秒片段",
-          "url": "https://hongguoduanju.com/video/public/7706006636074126361/360p.mp4"
+          "url": "https://hongguoduanju.com/video/public/7706514645208534041/360p.mp4",
+          "page": "https://hongguoduanju.com/player/7706512650816982040",
+          "durationMs": 10080,
+          "listedMs": 178000
         }
       ]
     },
@@ -141,133 +36,10 @@
         {
           "id": "7706406239239932952",
           "title": "第1集 · 10 秒片段",
-          "url": "https://hongguoduanju.com/video/public/7706406239239932952/360p.mp4"
-        }
-      ]
-    },
-    {
-      "id": "7700479683703344152",
-      "title": "不婚女孩儿不是软柿子",
-      "tags": [
-        "都市",
-        "都市日常",
-        "打脸反派",
-        "大女主"
-      ],
-      "cover": "https://p6-novel.byteimg.com/novel-pic/caf0102c73d527f3b12341d3a4f0b440~tplv-shrink:640:0.image",
-      "episodes": [
-        {
-          "id": "7700482553710382104",
-          "title": "第1集 · 10 秒片段",
-          "url": "https://hongguoduanju.com/video/public/7700482553710382104/360p.mp4"
-        }
-      ]
-    },
-    {
-      "id": "7700862621431385113",
-      "title": "鱼缸里到底有什么",
-      "tags": [
-        "悬疑",
-        "悬疑情感",
-        "自我救赎",
-        "打脸反派"
-      ],
-      "cover": "https://p3-novel.byteimg.com/novel-pic/5ecb5c8561ac42a64a350d280914e104~tplv-shrink:640:0.image",
-      "episodes": [
-        {
-          "id": "7700864561875799065",
-          "title": "第1集 · 10 秒片段",
-          "url": "https://hongguoduanju.com/video/public/7700864561875799065/360p.mp4"
-        }
-      ]
-    },
-    {
-      "id": "7628988585831582744",
-      "title": "重生分家：我靠养猪成首富",
-      "tags": [
-        "成长",
-        "重生逆袭",
-        "年代创业",
-        "自我救赎"
-      ],
-      "cover": "https://p6-novel.byteimg.com/novel-pic/f43397eb0b40092345d30e7cedf9301e~tplv-shrink:640:0.image",
-      "episodes": [
-        {
-          "id": "7628990438325636120",
-          "title": "第1集 · 10 秒片段",
-          "url": "https://hongguoduanju.com/video/public/7628990438325636120/360p.mp4"
-        }
-      ]
-    },
-    {
-      "id": "7709043759362624536",
-      "title": "我砌砖封了自家厕所，全夜市臭了",
-      "tags": [
-        "都市",
-        "都市日常",
-        "逆风翻盘",
-        "圆满结局"
-      ],
-      "cover": "https://p3-novel.byteimg.com/novel-pic/812eb1778e761561ffe1bd9b85cd445c~tplv-shrink:640:0.image",
-      "episodes": [
-        {
-          "id": "7709045672128826392",
-          "title": "第1集 · 10 秒片段",
-          "url": "https://hongguoduanju.com/video/public/7709045672128826392/360p.mp4"
-        }
-      ]
-    },
-    {
-      "id": "7708244379781057561",
-      "title": "左顾右你第二季：急诊摸鱼王",
-      "tags": [
-        "都市",
-        "医疗",
-        "逆风翻盘",
-        "大男主"
-      ],
-      "cover": "https://p6-novel.byteimg.com/novel-pic/2e9dae0cbec81e92c2c44cab7e40b0a1~tplv-shrink:640:0.image",
-      "episodes": [
-        {
-          "id": "7708246235160792088",
-          "title": "第1集 · 10 秒片段",
-          "url": "https://hongguoduanju.com/video/public/7708246235160792088/360p.mp4"
-        }
-      ]
-    },
-    {
-      "id": "7707621265934126142",
-      "title": "谁说纨绔当不了状元",
-      "tags": [
-        "古装",
-        "朝堂权谋",
-        "逆袭翻身",
-        "扮猪吃虎"
-      ],
-      "cover": "https://p3-novel.byteimg.com/novel-pic/16f89ff6d91bde98942a07a586657298~tplv-shrink:640:0.image",
-      "episodes": [
-        {
-          "id": "7707623352113843262",
-          "title": "第1集 · 10 秒片段",
-          "url": "https://hongguoduanju.com/video/public/7707623352113843262/360p.mp4"
-        }
-      ]
-    },
-    {
-      "id": "7706512650816982040",
-      "title": "少夫人来自东北3",
-      "tags": [
-        "家庭",
-        "家庭温情",
-        "团宠",
-        "直爽女主"
-      ],
-      "cover": "https://p3-novel.byteimg.com/novel-pic/899ba52ee34a534d9be948a093468ed1~tplv-shrink:640:0.image",
-      "episodes": [
-        {
-          "id": "7706514645208534041",
-          "title": "第1集 · 10 秒片段",
-          "url": "https://hongguoduanju.com/video/public/7706514645208534041/360p.mp4"
+          "url": "https://hongguoduanju.com/video/public/7706406239239932952/360p.mp4",
+          "page": "https://hongguoduanju.com/player/7706404415887903806",
+          "durationMs": 10080,
+          "listedMs": 151000
         }
       ]
     },
@@ -285,61 +57,325 @@
         {
           "id": "7704580213098679358",
           "title": "第1集 · 10 秒片段",
-          "url": "https://hongguoduanju.com/video/public/7704580213098679358/360p.mp4"
+          "url": "https://hongguoduanju.com/video/public/7704580213098679358/360p.mp4",
+          "page": "https://hongguoduanju.com/player/7704577081954274328",
+          "durationMs": 10080,
+          "listedMs": 103000
         }
       ]
     },
     {
-      "id": "7699072651079191576",
-      "title": "乡野判官",
+      "id": "7709022887188892697",
+      "title": "步步登阶第二部",
       "tags": [
-        "逆袭",
-        "经营奋斗",
-        "大男主",
-        "现代"
+        "爱情",
+        "都市爱情",
+        "情感流",
+        "小人物"
       ],
-      "cover": "https://p6-novel.byteimg.com/novel-pic/d65b86313ad5a3135b637f959f70fff4~tplv-shrink:640:0.image",
+      "cover": "https://p6-novel.byteimg.com/novel-pic/15aec4bf71c7ffc137f1a17fcf2c5f3a~tplv-shrink:640:0.image",
       "episodes": [
         {
-          "id": "7699075598391446590",
+          "id": "7709025042763369496",
           "title": "第1集 · 10 秒片段",
-          "url": "https://hongguoduanju.com/video/public/7699075598391446590/360p.mp4"
+          "url": "https://hongguoduanju.com/video/public/7709025042763369496/360p.mp4",
+          "page": "https://hongguoduanju.com/player/7709022887188892697",
+          "durationMs": 10067,
+          "listedMs": 107000
         }
       ]
     },
     {
-      "id": "7708667262277798936",
-      "title": "一份偏爱，两份命运",
+      "id": "7705454801290546200",
+      "title": "侯爷临终扶庶子上位，圣旨赐下后他慌了",
+      "tags": [
+        "成长",
+        "女性成长",
+        "逆风翻盘",
+        "圆满结局"
+      ],
+      "cover": "https://p3-novel.byteimg.com/novel-pic/ac89c9d1e4e50e57651c9857aa7de2cb~tplv-shrink:640:0.image",
+      "episodes": [
+        {
+          "id": "7705456646213864472",
+          "title": "第1集 · 10 秒片段",
+          "url": "https://hongguoduanju.com/video/public/7705456646213864472/360p.mp4",
+          "page": "https://hongguoduanju.com/player/7705454801290546200",
+          "durationMs": 10080,
+          "listedMs": 114000
+        }
+      ]
+    },
+    {
+      "id": "7701652979782257689",
+      "title": "她那么骄",
+      "tags": [
+        "爱情",
+        "都市爱情",
+        "先婚后爱",
+        "总裁"
+      ],
+      "cover": "https://p3-novel.byteimg.com/novel-pic/5d7a3a970abd4e936df4f59b3d9e2664~tplv-shrink:640:0.image",
+      "episodes": [
+        {
+          "id": "7701654934441184280",
+          "title": "第1集 · 10 秒片段",
+          "url": "https://hongguoduanju.com/video/public/7701654934441184280/360p.mp4",
+          "page": "https://hongguoduanju.com/player/7701652979782257689",
+          "durationMs": 10080,
+          "listedMs": 111000
+        }
+      ]
+    },
+    {
+      "id": "7705844953598938137",
+      "title": "一把杀猪刀，供出女状元",
+      "tags": [
+        "家庭",
+        "家庭温情",
+        "女性成长",
+        "双向救赎"
+      ],
+      "cover": "https://p3-novel.byteimg.com/novel-pic/ba7e771c6532c9906c3c0ddc122edf03~tplv-shrink:640:0.image",
+      "episodes": [
+        {
+          "id": "7705847840597085209",
+          "title": "第1集 · 10 秒片段",
+          "url": "https://hongguoduanju.com/video/public/7705847840597085209/360p.mp4",
+          "page": "https://hongguoduanju.com/player/7705844953598938137",
+          "durationMs": 10067,
+          "listedMs": 155000
+        }
+      ]
+    },
+    {
+      "id": "7701935931787316286",
+      "title": "十八岁太奶奶驾到，重整家族荣耀第五部",
+      "tags": [
+        "家族",
+        "家族振兴",
+        "穿越",
+        "扮猪吃虎"
+      ],
+      "cover": "https://p6-novel.byteimg.com/novel-pic/84a71f1a5d7ef5c9c16a73b74011ef75~tplv-shrink:640:0.image",
+      "episodes": [
+        {
+          "id": "7701937936731737112",
+          "title": "第1集 · 10 秒片段",
+          "url": "https://hongguoduanju.com/video/public/7701937936731737112/360p.mp4",
+          "page": "https://hongguoduanju.com/player/7701935931787316286",
+          "durationMs": 10067,
+          "listedMs": 173000
+        }
+      ]
+    },
+    {
+      "id": "7707152000470764569",
+      "title": "溯雨信笺：风铃巷之夏",
+      "tags": [
+        "青春",
+        "青春成长",
+        "青春爱情",
+        "日久生情"
+      ],
+      "cover": "https://p3-novel.byteimg.com/novel-pic/8733000e62f44eaacb78f44908aad04f~tplv-shrink:640:0.image",
+      "episodes": [
+        {
+          "id": "7707153809591520280",
+          "title": "第1集 · 10 秒片段",
+          "url": "https://hongguoduanju.com/video/public/7707153809591520280/360p.mp4",
+          "page": "https://hongguoduanju.com/player/7707152000470764569",
+          "durationMs": 10080,
+          "listedMs": 142000
+        }
+      ]
+    },
+    {
+      "id": "7706461625842142232",
+      "title": "做兄弟，在心中",
+      "tags": [
+        "都市",
+        "友情岁月",
+        "故人重逢",
+        "隐藏大佬"
+      ],
+      "cover": "https://p6-novel.byteimg.com/novel-pic/f01cba40a710db08f5abfad54bd3209a~tplv-shrink:640:0.image",
+      "episodes": [
+        {
+          "id": "7706463565590301721",
+          "title": "第1集 · 10 秒片段",
+          "url": "https://hongguoduanju.com/video/public/7706463565590301721/360p.mp4",
+          "page": "https://hongguoduanju.com/player/7706461625842142232",
+          "durationMs": 10080,
+          "listedMs": 123000
+        }
+      ]
+    },
+    {
+      "id": "7706059617473678361",
+      "title": "散了，也安生了",
       "tags": [
         "家庭",
         "家庭伦理",
-        "后悔流",
-        "悲剧结局"
+        "矛盾和解",
+        "大男主"
       ],
-      "cover": "https://p3-novel.byteimg.com/novel-pic/2cffccce074c58d2a9c3f6f26d5a1dc7~tplv-shrink:640:0.image",
+      "cover": "https://p3-novel.byteimg.com/novel-pic/a7c6d138d98a4d387b2c465d2ec5927a~tplv-shrink:640:0.image",
       "episodes": [
         {
-          "id": "7708669238013086745",
+          "id": "7706061583725628441",
           "title": "第1集 · 10 秒片段",
-          "url": "https://hongguoduanju.com/video/public/7708669238013086745/360p.mp4"
+          "url": "https://hongguoduanju.com/video/public/7706061583725628441/360p.mp4",
+          "page": "https://hongguoduanju.com/player/7706059617473678361",
+          "durationMs": 10067,
+          "listedMs": 118000
         }
       ]
     },
     {
-      "id": "7709079321620532248",
-      "title": "女儿被辱，龙头大嫂强势归来",
+      "id": "7703822281448901656",
+      "title": "温柔以待，终有回甘",
+      "tags": [
+        "家庭",
+        "家庭温情",
+        "治愈",
+        "后妈"
+      ],
+      "cover": "https://p6-novel.byteimg.com/novel-pic/80d25f9565ce34f9c664b0fdd79977e8~tplv-shrink:640:0.image",
+      "episodes": [
+        {
+          "id": "7703824211655019582",
+          "title": "第1集 · 10 秒片段",
+          "url": "https://hongguoduanju.com/video/public/7703824211655019582/360p.mp4",
+          "page": "https://hongguoduanju.com/player/7703822281448901656",
+          "durationMs": 10080,
+          "listedMs": 150000
+        }
+      ]
+    },
+    {
+      "id": "7707855002433244184",
+      "title": "闪婚神秘老公",
+      "tags": [
+        "爱情",
+        "都市爱情",
+        "先婚后爱",
+        "闪婚"
+      ],
+      "cover": "https://p3-novel.byteimg.com/novel-pic/56c2d260c0d46dde389dfa1cdda39ce1~tplv-shrink:640:0.image",
+      "episodes": [
+        {
+          "id": "7707858127462337561",
+          "title": "第1集 · 10 秒片段",
+          "url": "https://hongguoduanju.com/video/public/7707858127462337561/360p.mp4",
+          "page": "https://hongguoduanju.com/player/7707855002433244184",
+          "durationMs": 10067,
+          "listedMs": 94000
+        }
+      ]
+    },
+    {
+      "id": "7701614841315740696",
+      "title": "妻子背叛当天，我重掌大权",
       "tags": [
         "都市",
         "都市日常",
-        "势力纷争",
-        "强者回归"
+        "虐渣",
+        "大男主"
       ],
-      "cover": "https://p3-novel.byteimg.com/novel-pic/6e432f7b3d5051700bd86aec00bfea00~tplv-shrink:640:0.image",
+      "cover": "https://p6-novel.byteimg.com/novel-pic/1110421b1eb956f46d600421ab280908~tplv-shrink:640:0.image",
       "episodes": [
         {
-          "id": "7709081281065126936",
+          "id": "7701616849288432665",
           "title": "第1集 · 10 秒片段",
-          "url": "https://hongguoduanju.com/video/public/7709081281065126936/360p.mp4"
+          "url": "https://hongguoduanju.com/video/public/7701616849288432665/360p.mp4",
+          "page": "https://hongguoduanju.com/player/7701614841315740696",
+          "durationMs": 10067,
+          "listedMs": 144000
+        }
+      ]
+    },
+    {
+      "id": "7698299554948467736",
+      "title": "分你七套房，我调去新疆",
+      "tags": [
+        "家庭",
+        "家庭伦理",
+        "打脸反派",
+        "逆风翻盘"
+      ],
+      "cover": "https://p3-novel.byteimg.com/novel-pic/ae949f8eb23d2158a5556a1892d5d158~tplv-shrink:640:0.image",
+      "episodes": [
+        {
+          "id": "7698302444354145304",
+          "title": "第1集 · 10 秒片段",
+          "url": "https://hongguoduanju.com/video/public/7698302444354145304/360p.mp4",
+          "page": "https://hongguoduanju.com/player/7698299554948467736",
+          "durationMs": 10067,
+          "listedMs": 117000
+        }
+      ]
+    },
+    {
+      "id": "7704590737282714649",
+      "title": "诚信第一，我在都市找老赖们收债",
+      "tags": [
+        "都市",
+        "逆袭翻身",
+        "强者回归",
+        "打脸反派"
+      ],
+      "cover": "https://p6-novel.byteimg.com/novel-pic/326029c0e58f6070e3f0512faf8c99ce~tplv-shrink:640:0.image",
+      "episodes": [
+        {
+          "id": "7704592712854424601",
+          "title": "第1集 · 10 秒片段",
+          "url": "https://hongguoduanju.com/video/public/7704592712854424601/360p.mp4",
+          "page": "https://hongguoduanju.com/player/7704590737282714649",
+          "durationMs": 10067,
+          "listedMs": 123000
+        }
+      ]
+    },
+    {
+      "id": "7704915436629920792",
+      "title": "胭脂刃2之宫锁未央",
+      "tags": [
+        "爱情",
+        "古风爱情",
+        "宫斗宅斗",
+        "双重生"
+      ],
+      "cover": "https://p6-novel.byteimg.com/novel-pic/7230db9b84592eae78e1a2f88f38549c~tplv-shrink:640:0.image",
+      "episodes": [
+        {
+          "id": "7704917342366485528",
+          "title": "第1集 · 10 秒片段",
+          "url": "https://hongguoduanju.com/video/public/7704917342366485528/360p.mp4",
+          "page": "https://hongguoduanju.com/player/7704915436629920792",
+          "durationMs": 10080,
+          "listedMs": 98000
+        }
+      ]
+    },
+    {
+      "id": "7706890951175719961",
+      "title": "我的婆婆我罩着2：一致对外",
+      "tags": [
+        "家庭",
+        "家庭伦理",
+        "圆满结局",
+        "大女主"
+      ],
+      "cover": "https://p3-novel.byteimg.com/novel-pic/9cdb5ce41ff010f43e6112bfcabd3e4e~tplv-shrink:640:0.image",
+      "episodes": [
+        {
+          "id": "7706892777824455704",
+          "title": "第1集 · 10 秒片段",
+          "url": "https://hongguoduanju.com/video/public/7706892777824455704/360p.mp4",
+          "page": "https://hongguoduanju.com/player/7706890951175719961",
+          "durationMs": 10067,
+          "listedMs": 143000
         }
       ]
     },
@@ -357,7 +393,31 @@
         {
           "id": "7706102488578935832",
           "title": "第1集 · 10 秒片段",
-          "url": "https://hongguoduanju.com/video/public/7706102488578935832/360p.mp4"
+          "url": "https://hongguoduanju.com/video/public/7706102488578935832/360p.mp4",
+          "page": "https://hongguoduanju.com/player/7706100589712657470",
+          "durationMs": 10067,
+          "listedMs": 135000
+        }
+      ]
+    },
+    {
+      "id": "7704164246786935832",
+      "title": "高调离婚，叶太太她又狠又硬",
+      "tags": [
+        "家庭",
+        "婚姻经营",
+        "虐渣",
+        "圆满结局"
+      ],
+      "cover": "https://p3-novel.byteimg.com/novel-pic/bf258941c2ecb2871f055bc6496ec76b~tplv-shrink:640:0.image",
+      "episodes": [
+        {
+          "id": "7704166179627076632",
+          "title": "第1集 · 10 秒片段",
+          "url": "https://hongguoduanju.com/video/public/7704166179627076632/360p.mp4",
+          "page": "https://hongguoduanju.com/player/7704164246786935832",
+          "durationMs": 10067,
+          "listedMs": 148000
         }
       ]
     }

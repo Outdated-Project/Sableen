@@ -26,8 +26,9 @@ jobs:
       - id: version
         run: |
           python3 - <<'PY'
-          import os, pathlib, re
+          import os, pathlib, re, tomllib
           value = re.search(r'^version: (\d+\.\d+\.\d+)\+(\d+)$', pathlib.Path('pubspec.yaml').read_text(), re.M)
+          assert value[1] == tomllib.loads(pathlib.Path('rust/Cargo.toml').read_text())['package']['version']
           with open(os.environ['GITHUB_OUTPUT'], 'a') as out:
               print('version=' + value[1], file=out)
           PY
@@ -91,7 +92,8 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with: {persist-credentials: false}
-      - run: python3 tool/ci/check_streams.py
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - run: python3 tool/ci/check_streams.py --require-episodes
 
   linux:
     needs: quality
