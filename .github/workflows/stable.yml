@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: sableen-${{ github.workflow }}-${{ github.ref }}
+  group: sableen-${{ github.workflow }}-${{ github.ref }}-${{ github.sha }}
   cancel-in-progress: false
 
 jobs:
@@ -84,6 +84,14 @@ jobs:
           } finally { if (!$app.HasExited) { $app.Kill() } }
       - uses: ./.github/actions/artifact
         with: {file: Sableen-windows-x64-setup.exe}
+
+  sources:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with: {persist-credentials: false}
+      - run: python3 tool/ci/check_streams.py
 
   linux:
     needs: quality
@@ -168,7 +176,9 @@ jobs:
           "$signer" sign --ks "$store" --ks-key-alias sableen --ks-pass env:KEY_PASSWORD --key-pass env:KEY_PASSWORD --out "$apk" build/app/outputs/flutter-apk/app-release.apk
           "$signer" verify --verbose --print-certs "$apk" | tee "$RUNNER_TEMP/apk-signature"
           grep -Fqx 'Verified using v2 scheme (APK Signature Scheme v2): true' "$RUNNER_TEMP/apk-signature"
-          grep -Fqx "Signer #1 certificate SHA-256 digest: $CERT_SHA256" "$RUNNER_TEMP/apk-signature"
+          grep -Fqx 'Number of signers: 1' "$RUNNER_TEMP/apk-signature"
+          found=$(sed -nE 's/^.*[Ss]igner[^:]*:?[[:space:]]+certificate SHA-256 digest: ([0-9a-f]{64})$/\1/p' "$RUNNER_TEMP/apk-signature" | sort -u)
+          test "$found" = "$CERT_SHA256"
           python3 tool/ci/verify_assets.py "$apk"
       - name: Enable emulator acceleration
         run: |
@@ -213,10 +223,13 @@ jobs:
         with: {file: Sableen-web.zip}
 
   publish:
-    needs: [quality, windows, linux, apple, android, web]
+    needs: [quality, sources, windows, linux, apple, android, web]
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    concurrency:
+      group: sableen-stable-publication
+      cancel-in-progress: false
     permissions:
       actions: read
       contents: write
