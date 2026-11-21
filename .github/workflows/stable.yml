@@ -37,8 +37,10 @@ jobs:
           cargo fmt --manifest-path rust/Cargo.toml --check
           cargo clippy --locked --manifest-path rust/Cargo.toml --all-targets -- -D warnings
           cargo test --locked --manifest-path rust/Cargo.toml
+          dart pub get --directory rust_builder/cargokit/build_tool --enforce-lockfile
           flutter analyze --no-pub
           flutter test --no-pub test
+          python3 -m unittest discover -s tool/ci -p 'test_*.py'
           git diff --exit-code -- pubspec.lock rust/Cargo.lock
 
   windows:
