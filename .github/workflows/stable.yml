@@ -233,8 +233,25 @@ jobs:
       - uses: ./.github/actions/artifact
         with: {file: Sableen-web.zip}
 
+  packages:
+    needs: [windows, linux, android, web]
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with: {persist-credentials: false}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: tested-*
+          path: incoming
+      - name: Check all four CI packages against their build-runner digests
+        run: |
+          python3 tool/ci/release.py verify
+          (cd dist && sha256sum --check SHA256SUMS)
+
   publish:
-    needs: [quality, sources, windows, linux, apple, android, web]
+    needs: [quality, sources, packages, apple]
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
     timeout-minutes: 20

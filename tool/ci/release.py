@@ -29,11 +29,13 @@ def verify(incoming, output):
         check = folder / (name + '.sha256')
         if any(p.is_symlink() or not p.is_file() for p in (package, check)) or not package.stat().st_size:
             raise ValueError(f'Invalid package {name}')
-        expected = f'{digest(package)}  {name}\n'
-        if check.read_text(encoding='ascii') != expected:
+        checksum = digest(package)
+        # GNU sha256sum marks binary mode with '*', the default on Windows.
+        records = (f'{checksum}  {name}\n', f'{checksum} *{name}\n')
+        if check.read_text(encoding='ascii') not in records:
             raise ValueError(f'Checksum mismatch for {name}')
         shutil.copyfile(package, output / name)
-        checksums.append(expected)
+        checksums.append(f'{checksum}  {name}\n')
     (output / 'SHA256SUMS').write_bytes(''.join(checksums).encode('ascii'))
 
 

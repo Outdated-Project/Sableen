@@ -19,14 +19,16 @@ class ReleaseGateTest(unittest.TestCase):
             payload = name.encode('ascii')
             (directory / name).write_bytes(payload)
             checksum = hashlib.sha256(payload).hexdigest()
-            (directory / (name + '.sha256')).write_text(f'{checksum}  {name}\n', 'ascii')
+            marker = '*' if name.endswith('.exe') else ' '
+            (directory / (name + '.sha256')).write_text(f'{checksum} {marker}{name}\n', 'ascii')
 
     def test_verified_packages_keep_their_original_bytes(self):
         output = self.root / 'dist'
         verify(self.incoming, output)
         for name in PACKAGES:
             self.assertEqual((output / name).read_bytes(), name.encode('ascii'))
-        self.assertEqual(len((output / 'SHA256SUMS').read_text().splitlines()), len(PACKAGES))
+        expected = ''.join(f'{hashlib.sha256(name.encode("ascii")).hexdigest()}  {name}\n' for name in PACKAGES)
+        self.assertEqual((output / 'SHA256SUMS').read_bytes(), expected.encode('ascii'))
 
     def test_tampering_blocks_publication(self):
         name = PACKAGES[0]
