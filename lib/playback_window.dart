@@ -10,6 +10,19 @@ const displayChannel = OptionalMethodChannel('sableen/display');
 bool get androidVideo =>
     !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
 
+Future<bool> supportsSmallWindow() async => kIsWeb
+    ? browser.supportsPictureInPicture == true
+    : androidVideo &&
+          await displayChannel.invokeMethod<bool>('supportsPip') == true;
+
+Future<bool> enterSmallWindow(double ratio) async => kIsWeb
+    ? browser.enterPictureInPicture()
+    : androidVideo &&
+          await displayChannel.invokeMethod<bool>('enterPip', ratio) == true;
+
+void Function() observeBrowserPipExit(void Function() update) =>
+    browser.onExitPictureInPicture(update);
+
 Future<bool> videoInSmallWindow() async {
   if (kIsWeb) return browser.inPictureInPicture;
   return androidVideo &&

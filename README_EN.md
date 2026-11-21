@@ -15,7 +15,7 @@ The refresh tool follows chart entries to individual episodes, matches the publi
 
 ## Playback
 
-Opening a title enters fullscreen. Tap the center to pause or resume. The controls hide after three seconds of playback. Tap an edge or move the pointer to bring them back. Hiding the app pauses playback. Losing focus while the window remains visible allows playback to continue. Android exposes a picture-in-picture button on supported devices.
+Opening a title enters fullscreen. Tap the center to pause or resume. The controls hide after three seconds of playback. Tap an edge or move the pointer to bring them back. Hiding the app pauses playback. Losing focus while the window remains visible allows playback to continue. Supported Android devices and browsers with the standard Picture-in-Picture API expose a button for pop-out playback.
 
 Each theater owns one player and releases it on exit. It requests hardware decoding. Android requests a compatible refresh rate at the current resolution when the video declares its frame rate. The OS and driver choose the actual mode. The timeline updates independently of the video surface. Theme settings offer solid, blurred, refractive and Aero-style navigation materials.
 

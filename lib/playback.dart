@@ -57,6 +57,7 @@ class _TheaterState extends State<Theater> with WidgetsBindingObserver {
   bool showControls = true, smallWindow = false, supportsPip = false;
   Timer? hideControls;
   int visibilityChange = 0;
+  late final VoidCallback removePipListener;
   double? dragging;
   double requested = 0;
   int? skippedBreak;
@@ -66,21 +67,20 @@ class _TheaterState extends State<Theater> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    removePipListener = observeBrowserPipExit(_refreshVisibility);
     if (androidVideo) {
       displayChannel.setMethodCallHandler((call) async {
         if (call.method == 'pipChanged' && !closed) {
           smallWindow = call.arguments == true;
-          didChangeAppLifecycleState(
-            WidgetsBinding.instance.lifecycleState ?? AppLifecycleState.resumed,
-          );
+          _refreshVisibility();
           _update();
         }
       });
-      displayChannel.invokeMethod<bool>('supportsPip').then((value) {
-        supportsPip = value == true;
-        _update();
-      });
     }
+    supportsSmallWindow().then((value) {
+      supportsPip = value;
+      _update();
+    });
     final lifecycle = WidgetsBinding.instance.lifecycleState;
     background =
         lifecycle == AppLifecycleState.paused ||
@@ -103,6 +103,9 @@ class _TheaterState extends State<Theater> with WidgetsBindingObserver {
       player.stream.duration.listen((_) => _update()),
       player.stream.buffering.listen((_) {
         _resetEvidence();
+        if (!opening && !player.state.buffering && showControls) {
+          _scheduleControls(player.state.playing);
+        }
         _cadence();
         _update();
       }),
@@ -149,7 +152,11 @@ class _TheaterState extends State<Theater> with WidgetsBindingObserver {
       showControls = true;
     } else {
       hideControls = Timer(const Duration(seconds: 3), () {
-        if (!closed && dragging == null && !failed && !opening) {
+        if (!closed &&
+            dragging == null &&
+            !failed &&
+            !opening &&
+            !player.state.buffering) {
           setState(() => showControls = false);
         }
       });
@@ -205,6 +212,7 @@ class _TheaterState extends State<Theater> with WidgetsBindingObserver {
     }
     if (closed) return;
     opening = false;
+    _scheduleControls(player.state.playing);
     lastWrite = 0;
     lastTick = 0;
     elapsed.reset();
@@ -363,6 +371,14 @@ class _TheaterState extends State<Theater> with WidgetsBindingObserver {
     unawaited(_checkVisibility(state, revision));
   }
 
+  void _refreshVisibility() {
+    if (!closed) {
+      didChangeAppLifecycleState(
+        WidgetsBinding.instance.lifecycleState ?? AppLifecycleState.resumed,
+      );
+    }
+  }
+
   Future<void> _checkVisibility(AppLifecycleState state, int revision) async {
     final visible =
         state != AppLifecycleState.detached && await videoInSmallWindow();
@@ -379,6 +395,7 @@ class _TheaterState extends State<Theater> with WidgetsBindingObserver {
   @override
   void dispose() {
     closed = true;
+    removePipListener();
     hideControls?.cancel();
     if (androidVideo) displayChannel.setMethodCallHandler(null);
     _cadence();
@@ -515,12 +532,10 @@ class _TheaterState extends State<Theater> with WidgetsBindingObserver {
                                 onPressed: () async {
                                   final w = player.state.width ?? 0,
                                       h = player.state.height ?? 0;
-                                  final ok = await displayChannel
-                                      .invokeMethod<bool>(
-                                        'enterPip',
-                                        w > 0 && h > 0 ? w / h : 1.0,
-                                      );
-                                  if (context.mounted && ok != true) {
+                                  final ok = await enterSmallWindow(
+                                    w > 0 && h > 0 ? w / h : 1.0,
+                                  );
+                                  if (context.mounted && !ok) {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
                                         content: Text(

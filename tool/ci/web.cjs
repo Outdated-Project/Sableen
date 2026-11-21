@@ -39,6 +39,14 @@ async function test() {
         const video = document.querySelector('video');
         return video?.currentTime >= 1 && video.videoWidth > 0;
       }, null, { timeout: 45000 });
+      if (publisher === '红果漫剧' && await page.evaluate(() => document.pictureInPictureEnabled)) {
+        await page.mouse.move(80, 80);
+        await page.getByRole('button', { name: '小窗播放' }).press('Enter');
+        await page.waitForFunction(() => document.pictureInPictureElement?.tagName === 'VIDEO');
+        const time = await page.evaluate(() => document.pictureInPictureElement.currentTime);
+        await page.waitForFunction(t => document.pictureInPictureElement?.currentTime > t + .4, time);
+        await page.evaluate(() => document.exitPictureInPicture());
+      }
       if (publisher === '红果短剧') {
         await page.locator('video').first().evaluate(v => { v.currentTime = v.duration * .45; });
         await page.waitForFunction(() => { const v = document.querySelector('video'); return v?.currentTime >= v?.duration * .5; });

@@ -48,7 +48,7 @@ if __name__ == '__main__':
         tap(wait_for_node(lambda text: label in text, 60))
         tap(wait_for_node(lambda text: title in text, 60))
         # A running clock prevents UiAutomator's idle-based dump. Pause at the
-        # center, inspect the stable timeline, then resume and confirm it moved.
+        # center and inspect the stable timeline after real playback.
         size = subprocess.check_output(['adb', 'shell', 'wm', 'size'], text=True)
         width, height = map(int, re.findall(r'(\d+)x(\d+)', size)[-1])
         center = ['adb', 'shell', 'input', 'tap', str(width // 2), str(height // 2)]

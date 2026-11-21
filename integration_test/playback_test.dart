@@ -67,6 +67,10 @@ void main() {
             player().state.position.inMilliseconds >= 1200 &&
             (player().state.width ?? 0) > 0,
       );
+      await until(
+        'Fullscreen controls did not hide',
+        () => find.byType(Slider).evaluate().isEmpty,
+      );
       await tester.tap(center);
       await until('Center tap failed to pause', () => !player().state.playing);
       await tester.tap(center);
@@ -75,17 +79,25 @@ void main() {
         'Unfocused video stalled',
         () =>
             player().state.playing &&
-            player().state.position.inMilliseconds >= 2300,
+            player().state.position.inMilliseconds >= 3900,
       );
+      final paused = player().stream.playing.firstWhere((playing) => !playing);
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
-      await until(
-        'Background video still playing',
-        () => !player().state.playing,
-      );
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      // Hidden views do not schedule Flutter frames. Observe the native player
+      // directly so that this check also works when no frame can be pumped.
+      try {
+        await paused.timeout(const Duration(seconds: 10));
+      } finally {
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.inactive,
+        );
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        );
+      }
       await tester.pump();
       final slider = tester.widget<Slider>(find.byType(Slider));
-      final target = (slider.max * .65).round();
+      final target = (slider.max * .75).round();
       slider.onChangeEnd!(target.toDouble());
       await until(
         'Seek failed',
