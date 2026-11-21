@@ -14,7 +14,8 @@ SolidCompression=yes
 UninstallDisplayIcon={app}\sableen.exe
 
 [Files]
-Source: "..\..\build\windows\x64\runner\Release\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
+Source: "..\..\build\windows\x64\runner\Release\*"; Excludes: "*.pdb"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
+Source: "{#GetEnv("SABLEEN_VC_REDIST")}\*.dll"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\Sableen"; Filename: "{app}\sableen.exe"

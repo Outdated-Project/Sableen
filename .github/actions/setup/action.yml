@@ -11,6 +11,7 @@ runs:
     - shell: bash
       run: |
         set -euo pipefail
+        flutter --version
         flutter --version --machine | python -c "import json,sys; assert json.load(sys.stdin)['frameworkRevision'] == 'c197ca5199e9ee5661e865596c9c07294dfab51c'"
         rustup toolchain install 1.99.1 --profile minimal
         rustup default 1.99.1

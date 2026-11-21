@@ -60,6 +60,11 @@ jobs:
         shell: pwsh
         run: |
           $compiler = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vs = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          $crt = Get-ChildItem "$vs/VC/Redist/MSVC/*/x64/Microsoft.VC*.CRT" -Directory | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+          if (!$crt -or !(Test-Path "$($crt.FullName)/vcruntime140_1.dll")) { throw 'Visual C++ x64 redistributable missing' }
+          $env:SABLEEN_VC_REDIST = $crt.FullName
           & $compiler tool/ci/windows.iss
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           $dir = "$env:RUNNER_TEMP\InstalledSableen"
@@ -91,9 +96,11 @@ jobs:
         with: {persist-credentials: false}
       - run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libmpv-dev libepoxy-dev xvfb xdotool mesa-utils
+          sudo apt-get install -y libgtk-3-dev libmpv-dev libepoxy-dev xvfb xdotool mesa-utils openbox pulseaudio
       - uses: ./.github/actions/setup
-      - run: xvfb-run -a flutter test --no-pub integration_test/playback_test.dart -d linux
+      - run: |
+          pulseaudio --start --exit-idle-time=-1
+          xvfb-run -a bash -euc 'openbox & flutter test --no-pub integration_test/playback_test.dart -d linux'
       - run: flutter build linux --release
       - run: bash tool/ci/linux-package.sh
       - uses: ./.github/actions/artifact

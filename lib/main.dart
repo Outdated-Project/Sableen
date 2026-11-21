@@ -2,12 +2,12 @@ import 'dart:async';
 
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:media_kit/media_kit.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'design.dart';
 import 'home.dart';
 import 'library.dart';
+import 'playback.dart';
 import 'preferences.dart';
 import 'src/rust/frb_generated.dart';
 
@@ -39,7 +39,7 @@ class _SableenState extends State<Sableen> {
         await RustLib.init();
         bridge = true;
       }
-      MediaKit.ensureInitialized();
+      await initializePlayback();
       await prefs.restore();
       try {
         await library.restore();

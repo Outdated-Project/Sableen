@@ -11,6 +11,18 @@ import 'design.dart';
 import 'library.dart';
 import 'src/rust/api/library.dart';
 
+bool _acceleratedTexture = true;
+
+Future<void> initializePlayback() async {
+  MediaKit.ensureInitialized();
+  if (!kIsWeb && defaultTargetPlatform == TargetPlatform.macOS) {
+    _acceleratedTexture =
+        await const MethodChannel('sableen/video')
+            .invokeMethod<bool>('supportsAcceleratedTexture') ??
+        false;
+  }
+}
+
 String clock(int ms) {
   final seconds = ms ~/ 1000;
   return '${seconds ~/ 60}:${(seconds % 60).toString().padLeft(2, '0')}';
@@ -62,8 +74,8 @@ class _TheaterState extends State<Theater> with WidgetsBindingObserver {
     );
     video = VideoController(
       player,
-      configuration: const VideoControllerConfiguration(
-        enableHardwareAcceleration: true,
+      configuration: VideoControllerConfiguration(
+        enableHardwareAcceleration: _acceleratedTexture,
       ),
     );
     subscriptions.addAll([
@@ -95,6 +107,7 @@ class _TheaterState extends State<Theater> with WidgetsBindingObserver {
       }),
       player.stream.error.listen((error) {
         if (error.isNotEmpty && !closed) {
+          if (kDebugMode) debugPrint('Player reported: $error');
           failed = true;
           _cadence();
           _update();
@@ -191,8 +204,15 @@ class _TheaterState extends State<Theater> with WidgetsBindingObserver {
   }
 
   void _position(Duration position) {
-    if (closed || opening || failed || seeking || background) return;
+    if (closed || opening || seeking || background) return;
     final ms = position.inMilliseconds, now = elapsed.elapsedMilliseconds;
+    if (failed) {
+      if (!player.state.playing || player.state.buffering || ms <= previous)
+        return;
+      failed = false;
+      _resetEvidence();
+      _update();
+    }
     final resume = pendingWebStart;
     if (resume != null) {
       final duration = player.state.duration.inMilliseconds;

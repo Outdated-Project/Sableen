@@ -25,10 +25,13 @@ async function test() {
     const page = await browser.newPage({ viewport: { width: 1000, height: 780 } });
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
+    page.on('requestfailed', req => console.error('Request failed', new URL(req.url()).hostname, req.failure()?.errorText));
+    page.on('response', res => { if (res.status() >= 400) console.error('HTTP', res.status(), new URL(res.url()).hostname); });
     await page.goto(`http://127.0.0.1:${server.address().port}`);
     await page.locator('flt-semantics-placeholder').dispatchEvent('click');
     const titles = [['央视频剧场', '梦笔不能停'], ['广州微短剧', '源起'], ['红果片段', '做兄弟，在心中']];
     for (const [publisher, title] of titles) {
+      console.log('Testing', publisher, title);
       await page.getByRole('checkbox', { name: publisher }).press('Space');
       await page.getByRole('button', { name: new RegExp(title) }).first().press('Enter');
       await page.waitForFunction(() => {
