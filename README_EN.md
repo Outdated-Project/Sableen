@@ -2,6 +2,12 @@
 
 [简体中文](README.md)
 
+## Stable downloads and automated releases
+
+Download published builds from [GitHub Releases](https://github.com/blueokanna/Sableen/releases/latest). Choose the `.exe` installer for Windows x64, the universal `.apk` for Android or the `.deb` for Ubuntu 24.04 x64. The Web archive is for self-hosting. iOS and macOS participate in CI builds and playback tests. Apple distribution packages require signing and provisioning. The Windows installer has GitHub build provenance. Authenticode signing is currently unconfigured.
+
+On updates to `main`, [GitHub Actions](https://github.com/blueokanna/Sableen/actions/workflows/stable.yml) reads the three-part version from `pubspec.yaml` and publishes a new version after all required jobs pass. The build jobs record SHA-256 checksums. The release job verifies all four packages, attests their provenance and compares the uploaded draft assets against the verified bytes before publication. Published versions are preserved. Use `gh attestation verify FILE --repo blueokanna/Sableen` and compare the digest against the release's `SHA256SUMS`.
+
 Open the theater to watch all twelve episodes of 《梦笔不能停》, a Hongguo co-production streamed by CCTV. The bundled catalog also includes Guangzhou short dramas and public clips from Hongguo. Select a title to play, choose an episode or resume watching. Watch history and genre preferences stay on the device. The interface supports Simplified and Traditional Chinese.
 
 ### Available media

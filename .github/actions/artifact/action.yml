@@ -1,0 +1,23 @@
+name: Preserve tested package
+description: Record a checksum on the build runner and upload its exact output
+inputs:
+  file:
+    required: true
+    description: Basename of the tested package in dist
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      working-directory: dist
+      env:
+        PACKAGE: ${{ inputs.file }}
+      run: sha256sum "$PACKAGE" > "$PACKAGE.sha256"
+    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      with:
+        name: tested-${{ inputs.file }}
+        path: |
+          dist/${{ inputs.file }}
+          dist/${{ inputs.file }}.sha256
+        if-no-files-found: error
+        retention-days: 14
+        compression-level: 0

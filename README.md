@@ -2,6 +2,12 @@
 
 [English](README_EN.md)
 
+## 稳定版下载与自动发布
+
+从 [GitHub Releases](https://github.com/blueokanna/Sableen/releases/latest) 下载已发布的版本。Windows x64 使用 `.exe` 安装程序，Android 使用通用 `.apk`，Ubuntu 24.04 x64 使用 `.deb`。Web 压缩包供服务器部署使用。iOS 和 macOS 参加 CI 编译和播放测试，Apple 安装包需要发行证书与分发配置。Windows 安装程序目前使用 GitHub 构建证明验证来源，未配置 Authenticode 签名。
+
+`main` 更新后，[GitHub Actions](https://github.com/blueokanna/Sableen/actions/workflows/stable.yml) 自动读取 `pubspec.yaml` 的三段版本号，并在全部必需任务成功后发布新版本。构建任务记录包的 SHA-256，发布任务复核四个产物、生成来源证明，并逐一比对 GitHub 草稿附件的摘要。已经公开的版本不会被流水线覆盖。可用 `gh attestation verify 文件名 --repo blueokanna/Sableen` 验证来源，并与同一 Release 中的 `SHA256SUMS` 比对。
+
 首次打开即可播放红果联合出品、央视网展播的《梦笔不能停》全 12 集。公共剧场还收录广州发布方展播的微短剧和红果官网公开片段。点开剧目可播放、选集或续播。观看历史和题材偏好保存在本机，界面可切换简体中文与繁体中文。
 
 ### 可播放内容

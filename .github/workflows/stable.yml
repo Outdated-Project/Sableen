@@ -1,0 +1,232 @@
+name: Stable build and release
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sableen-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  quality:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with: {persist-credentials: false}
+      - uses: ./.github/actions/setup
+      - id: version
+        run: |
+          python3 - <<'PY'
+          import os, pathlib, re
+          value = re.search(r'^version: (\d+\.\d+\.\d+)\+(\d+)$', pathlib.Path('pubspec.yaml').read_text(), re.M)
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as out:
+              print('version=' + value[1], file=out)
+          PY
+      - name: Check Rust core and Flutter interface
+        run: |
+          rustup component add rustfmt clippy
+          cargo fmt --manifest-path rust/Cargo.toml --check
+          cargo clippy --locked --manifest-path rust/Cargo.toml --all-targets -- -D warnings
+          cargo test --locked --manifest-path rust/Cargo.toml
+          flutter analyze --no-pub
+          flutter test --no-pub test
+          git diff --exit-code -- pubspec.lock rust/Cargo.lock
+
+  windows:
+    needs: quality
+    runs-on: windows-2022
+    timeout-minutes: 75
+    env:
+      APP_VERSION: ${{ needs.quality.outputs.version }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with: {persist-credentials: false}
+      - uses: ./.github/actions/setup
+      - name: Test real playback, seeking and resume
+        run: flutter test --no-pub integration_test/playback_test.dart -d windows
+      - run: flutter build windows --release
+      - name: Install and launch the release package
+        shell: pwsh
+        run: |
+          $compiler = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          & $compiler tool/ci/windows.iss
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $dir = "$env:RUNNER_TEMP\InstalledSableen"
+          $installer = Start-Process dist/Sableen-windows-x64-setup.exe -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=`"$dir`"" -Wait -PassThru
+          if ($installer.ExitCode) { exit $installer.ExitCode }
+          python tool/ci/verify_assets.py "$dir/data/flutter_assets"
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $app = Start-Process "$dir/sableen.exe" -PassThru
+          try {
+            for ($i=0; $i -lt 60; $i++) {
+              $app.Refresh()
+              if ($app.HasExited) { throw 'Installed application exited during startup' }
+              if ($app.MainWindowHandle -ne 0 -and $app.Responding) { break }
+              Start-Sleep 1
+            }
+            if ($app.MainWindowHandle -eq 0 -or !$app.Responding) { throw 'No responsive application window' }
+          } finally { if (!$app.HasExited) { $app.Kill() } }
+      - uses: ./.github/actions/artifact
+        with: {file: Sableen-windows-x64-setup.exe}
+
+  linux:
+    needs: quality
+    runs-on: ubuntu-24.04
+    timeout-minutes: 65
+    env:
+      APP_VERSION: ${{ needs.quality.outputs.version }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with: {persist-credentials: false}
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libmpv-dev libepoxy-dev xvfb xdotool mesa-utils
+      - uses: ./.github/actions/setup
+      - run: xvfb-run -a flutter test --no-pub integration_test/playback_test.dart -d linux
+      - run: flutter build linux --release
+      - run: bash tool/ci/linux-package.sh
+      - uses: ./.github/actions/artifact
+        with: {file: Sableen-ubuntu24-amd64.deb}
+
+  apple:
+    needs: quality
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [ios, macos]
+    runs-on: macos-15
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with: {persist-credentials: false}
+      - uses: ./.github/actions/setup
+      - name: Test macOS playback and link the release application
+        if: matrix.platform == 'macos'
+        run: |
+          flutter test integration_test/playback_test.dart -d macos
+          flutter build macos --release
+          assets=$(find build/macos/Build/Products/Release -name flutter_assets -type d -print -quit)
+          python3 tool/ci/verify_assets.py "$assets"
+      - name: Test iOS simulator and link the arm64 device application
+        if: matrix.platform == 'ios'
+        run: |
+          id=$(xcrun simctl list devices available -j | python3 -c "import json,sys; print(next(d['udid'] for k, ds in reversed(sorted(json.load(sys.stdin)['devices'].items())) if 'iOS' in k for d in ds if d['name'].startswith('iPhone')))")
+          xcrun simctl boot "$id"
+          xcrun simctl bootstatus "$id" -b
+          flutter test integration_test/playback_test.dart -d "$id"
+          flutter build ios --release --no-codesign
+          assets=$(find build/ios/iphoneos/Runner.app -name flutter_assets -type d -print -quit)
+          python3 tool/ci/verify_assets.py "$assets"
+
+  android:
+    needs: quality
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with: {persist-credentials: false}
+      - uses: ./.github/actions/setup
+      - run: flutter build apk --release
+      - name: Prepare universal APK
+        run: |
+          mkdir dist
+          cp build/app/outputs/flutter-apk/app-release.apk dist/Sableen-android-universal.apk
+          python3 tool/ci/verify_assets.py dist/Sableen-android-universal.apk
+      - name: Sign and verify the distribution APK
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_RELEASE_KEYSTORE }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_RELEASE_PASSWORD }}
+          CERT_SHA256: ${{ vars.ANDROID_RELEASE_CERT_SHA256 }}
+        run: |
+          set -euo pipefail
+          : "${KEYSTORE_B64:?Missing release keystore}" "${KEY_PASSWORD:?Missing signing password}" "${CERT_SHA256:?Missing certificate fingerprint}"
+          umask 077
+          store=$(mktemp)
+          trap 'rm -f "$store"' EXIT
+          printf '%s' "$KEYSTORE_B64" | base64 -d > "$store"
+          signer=$(find "$ANDROID_HOME/build-tools" -name apksigner | sort -V | tail -1)
+          apk=dist/Sableen-android-universal.apk
+          "$signer" sign --ks "$store" --ks-key-alias sableen --ks-pass env:KEY_PASSWORD --key-pass env:KEY_PASSWORD --out "$apk" build/app/outputs/flutter-apk/app-release.apk
+          "$signer" verify --verbose --print-certs "$apk" | tee "$RUNNER_TEMP/apk-signature"
+          grep -Fqx 'Verified using v2 scheme (APK Signature Scheme v2): true' "$RUNNER_TEMP/apk-signature"
+          grep -Fqx "Signer #1 certificate SHA-256 digest: $CERT_SHA256" "$RUNNER_TEMP/apk-signature"
+          python3 tool/ci/verify_assets.py "$apk"
+      - name: Enable emulator acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: ReactiveCircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          script: bash tool/ci/android-smoke.sh
+      - uses: ./.github/actions/artifact
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        with: {file: Sableen-android-universal.apk}
+
+  web:
+    needs: quality
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with: {persist-credentials: false}
+      - uses: ./.github/actions/setup
+      - name: Build Flutter and the Rust Wasm module
+        run: |
+          rustup toolchain install nightly-2026-11-08 --profile minimal --component rust-src --target wasm32-unknown-unknown
+          cargo install flutter_rust_bridge_codegen --version 2.13.0 --locked
+          cargo install wasm-pack --version 0.15.1 --locked
+          flutter_rust_bridge_codegen build-web --release --wasm-pack-rustup-toolchain nightly-2026-11-08
+          flutter build web --release --no-web-resources-cdn
+          cmp web/pkg/rust_lib_sableen_bg.wasm build/web/pkg/rust_lib_sableen_bg.wasm
+          python3 tool/ci/verify_assets.py build/web/assets
+      - name: Test the distribution archive in Chrome
+        run: |
+          mkdir dist
+          (cd build/web && zip -qr ../../dist/Sableen-web.zip .)
+          unzip -q dist/Sableen-web.zip -d "$RUNNER_TEMP/web-under-test"
+          npm ci --prefix tool/ci --ignore-scripts
+          node tool/ci/web.cjs "$RUNNER_TEMP/web-under-test"
+      - uses: ./.github/actions/artifact
+        with: {file: Sableen-web.zip}
+
+  publish:
+    needs: [quality, windows, linux, apple, android, web]
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      actions: read
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with: {persist-credentials: false}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: tested-*
+          path: incoming
+      - name: Verify exact artifact set and builders' digests
+        run: python3 tool/ci/release.py verify
+      - uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
+        with:
+          subject-path: dist/*
+      - name: Verify draft uploads and publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          APP_VERSION: ${{ needs.quality.outputs.version }}
+        run: python3 tool/ci/release.py publish

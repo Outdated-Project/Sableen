@@ -1,0 +1,18 @@
+name: Set up Sableen
+description: Install the project toolchains and enforce the dependency lockfiles
+runs:
+  using: composite
+  steps:
+    - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+      with:
+        flutter-version: 3.47.9
+        channel: stable
+        cache: false
+    - shell: bash
+      run: |
+        set -euo pipefail
+        flutter --version --machine | python -c "import json,sys; assert json.load(sys.stdin)['frameworkRevision'] == 'c197ca5199e9ee5661e865596c9c07294dfab51c'"
+        rustup toolchain install 1.99.1 --profile minimal
+        rustup default 1.99.1
+        flutter pub get --enforce-lockfile
+        cargo fetch --locked --manifest-path rust/Cargo.toml
