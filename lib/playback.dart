@@ -207,8 +207,9 @@ class _TheaterState extends State<Theater> with WidgetsBindingObserver {
     if (closed || opening || seeking || background) return;
     final ms = position.inMilliseconds, now = elapsed.elapsedMilliseconds;
     if (failed) {
-      if (!player.state.playing || player.state.buffering || ms <= previous)
+      if (!player.state.playing || player.state.buffering || ms <= previous) {
         return;
+      }
       failed = false;
       _resetEvidence();
       _update();
