@@ -3,6 +3,7 @@ import argparse
 from concurrent.futures import ThreadPoolExecutor
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -25,6 +26,14 @@ def check(record):
     measured = round(duration(media) * 1000)
     if abs(measured - episode['durationMs']) > 250 or listed != episode['listedMs']:
         raise ValueError(f'Media duration changed on {page}')
+    # The duration in the MP4 header can outlast the decodable video.
+    last_frame = subprocess.check_output([
+        'ffmpeg', '-nostdin', '-v', 'error', '-xerror', '-rw_timeout', '12000000',
+        '-protocol_whitelist', 'https,tls,tcp', '-ss', f'{max(0, measured - 600) / 1000:.3f}',
+        '-i', media, '-map', '0:v:0', '-frames:v', '1', '-f', 'framemd5', '-',
+    ], timeout=30, text=True)
+    if not any(row.startswith('0,') for row in last_frame.splitlines()):
+        raise ValueError(f'Cannot decode video near the declared end of {page}')
     full = listed > 0 and abs(listed - measured) <= 1000
     if ('片段' in episode['title']) == full:
         raise ValueError(f'Incorrect preview label on {page}')

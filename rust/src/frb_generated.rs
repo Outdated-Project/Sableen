@@ -319,12 +319,14 @@ impl SseDecode for crate::api::library::Episode {
         let mut var_id = <String>::sse_decode(deserializer);
         let mut var_title = <String>::sse_decode(deserializer);
         let mut var_url = <String>::sse_decode(deserializer);
+        let mut var_page = <Option<String>>::sse_decode(deserializer);
         let mut var_adBreaks =
             <Option<Vec<crate::api::library::AdBreak>>>::sse_decode(deserializer);
         return crate::api::library::Episode {
             id: var_id,
             title: var_title,
             url: var_url,
+            page: var_page,
             ad_breaks: var_adBreaks,
         };
     }
@@ -584,6 +586,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::library::Episode {
             self.id.into_into_dart().into_dart(),
             self.title.into_into_dart().into_dart(),
             self.url.into_into_dart().into_dart(),
+            self.page.into_into_dart().into_dart(),
             self.ad_breaks.into_into_dart().into_dart(),
         ]
         .into_dart()
@@ -668,6 +671,7 @@ impl SseEncode for crate::api::library::Episode {
         <String>::sse_encode(self.id, serializer);
         <String>::sse_encode(self.title, serializer);
         <String>::sse_encode(self.url, serializer);
+        <Option<String>>::sse_encode(self.page, serializer);
         <Option<Vec<crate::api::library::AdBreak>>>::sse_encode(self.ad_breaks, serializer);
     }
 }

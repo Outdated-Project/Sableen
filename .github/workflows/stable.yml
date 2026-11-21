@@ -194,6 +194,14 @@ jobs:
           arch: x86_64
           target: google_apis
           script: bash tool/ci/android-smoke.sh
+      - name: Save the emulator view on playback failure
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: android-playback-diagnostic
+          path: ${{ runner.temp }}/android-playback.png
+          if-no-files-found: ignore
+          retention-days: 2
       - uses: ./.github/actions/artifact
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         with: {file: Sableen-android-universal.apk}

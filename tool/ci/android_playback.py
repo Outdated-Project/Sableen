@@ -1,5 +1,6 @@
 import re
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -70,6 +71,7 @@ def observe_video(aspect, frames):
     start = time.monotonic()
     first = None
     best = float('inf')
+    best_screen = None
     while time.monotonic() - start < 65:
         raw = subprocess.check_output(['adb', 'exec-out', 'screencap', '-p'], timeout=12)
         with Image.open(BytesIO(raw)) as image:
@@ -80,13 +82,17 @@ def observe_video(aspect, frames):
             actual = view.resize((32, 32), Image.Resampling.BOX).crop(region).tobytes()
         errors = [sum(abs(a - b) for a, b in zip(actual, ref)) / len(actual) for ref in signatures]
         frame = min(range(len(errors)), key=errors.__getitem__)
-        best = min(best, errors[frame])
+        if errors[frame] < best:
+            best = errors[frame]
+            best_screen = raw
         if errors[frame] < 20:
             if first is None:
                 first = frame
             elif frame >= max(9, first + 3) and sum(abs(a - b) for a, b in zip(signatures[first], signatures[frame])) / len(actual) > 6:
                 print(f'Decoded publisher frames at {first / 4:.2f}s and {frame / 4:.2f}s', flush=True)
                 return w, h
+    if best_screen and os.environ.get('RUNNER_TEMP'):
+        (Path(os.environ['RUNNER_TEMP']) / 'android-playback.png').write_bytes(best_screen)
     raise RuntimeError(f'No advancing publisher frames detected. Minimum RGB difference {best:.1f}, first match {first}')
 
 

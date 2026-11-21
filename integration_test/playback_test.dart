@@ -4,8 +4,10 @@ import 'package:material_ui/material_ui.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:sableen/design.dart';
+import 'package:sableen/home.dart';
 import 'package:sableen/library.dart';
 import 'package:sableen/playback.dart';
+import 'package:sableen/preferences.dart';
 import 'package:sableen/src/rust/frb_generated.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -22,12 +24,18 @@ class _TestPreferences extends SharedPreferencesAsync {
 }
 
 void main() {
-  IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  setUpAll(() async {
+    // Keep the platform's accessibility request stable while native fullscreen
+    // windows gain and lose focus. Exercise the accessible controls throughout.
+    binding.platformDispatcher.semanticsEnabledTestValue = true;
+    await RustLib.init();
+    await initializePlayback();
+  });
+  tearDownAll(binding.platformDispatcher.clearSemanticsEnabledTestValue);
   testWidgets('Hongguo video, center tap, visibility, seek and resume', (
     tester,
   ) async {
-    await RustLib.init();
-    await initializePlayback();
     final disk = _TestPreferences();
     addTearDown(() => disk.clear(allowList: disk.keys));
     final library = Library(disk);
@@ -47,15 +55,47 @@ void main() {
       }
     }
 
-    Future<void> open(Library library, String id) => tester.pumpWidget(
-      MaterialApp(
-        locale: hans,
-        supportedLocales: const [hans, hant],
-        localizationsDelegates: GlobalMaterialLocalizations.delegates,
-        theme: theaterTheme(Brightness.light, null, Palette.monet),
-        home: Theater(library: library, drama: library.byId[id]!, initial: 0),
-      ),
-    );
+    Future<void> open(Library source, String id) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: hans,
+          supportedLocales: const [hans, hant],
+          localizationsDelegates: GlobalMaterialLocalizations.delegates,
+          theme: theaterTheme(Brightness.light, null, Palette.monet),
+          home: Home(library: source, preferences: Preferences(disk)),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final filter = find.text(
+        source.publishers[id] == Publisher.comic ? '红果漫剧' : '红果短剧',
+      );
+      await tester.ensureVisible(filter);
+      await tester.tap(filter);
+      await tester.pumpAndSettle();
+      final title = find.text(source.byId[id]!.title);
+      final card = find
+          .ancestor(of: title, matching: find.byType(InkWell))
+          .first;
+      await Scrollable.ensureVisible(tester.element(card), alignment: .35);
+      await tester.pumpAndSettle();
+      await tester.tap(card);
+      final deadline = Stopwatch()..start();
+      while (find.byType(Video).evaluate().isEmpty &&
+          deadline.elapsed < const Duration(seconds: 5)) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+      expect(
+        find.byType(Video),
+        findsOneWidget,
+        reason: 'Card did not open ${source.byId[id]!.title}',
+      );
+    }
+
+    Future<void> close() async {
+      Navigator.of(tester.element(find.byType(Theater))).pop();
+      await tester.pumpAndSettle();
+    }
+
     for (final category in Publisher.values) {
       final id = library.publishers.entries
           .firstWhere((e) => e.value == category)
@@ -109,7 +149,7 @@ void main() {
         'Post-seek playback stalled',
         () => player().state.position.inMilliseconds >= target + 500,
       );
-      await tester.pumpWidget(const SizedBox());
+      await close();
       await library.pendingWrites;
       final restored = Library(disk);
       await restored.restore();
@@ -123,8 +163,8 @@ void main() {
             player().state.position.inMilliseconds >= progress.positionMs &&
             player().state.playing,
       );
-      await tester.pumpWidget(const SizedBox());
+      await close();
       await restored.pendingWrites;
     }
-  });
+  }, timeout: const Timeout(Duration(minutes: 5)));
 }

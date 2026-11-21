@@ -14,9 +14,16 @@ import 'playback_window.dart';
 import 'src/rust/api/library.dart';
 
 bool _acceleratedTexture = true;
+bool _androidEmulator = false;
 
 Future<void> initializePlayback() async {
   MediaKit.ensureInitialized();
+  if (androidVideo) {
+    _androidEmulator =
+        await const OptionalMethodChannel('com.alexmercerind/media_kit_video')
+            .invokeMethod<bool>('Utils.IsEmulator') ??
+        false;
+  }
   if (!kIsWeb && defaultTargetPlatform == TargetPlatform.macOS) {
     _acceleratedTexture =
         await const MethodChannel('sableen/video')
@@ -96,9 +103,19 @@ class _TheaterState extends State<Theater> with WidgetsBindingObserver {
       player,
       configuration: VideoControllerConfiguration(
         enableHardwareAcceleration: _acceleratedTexture,
+        // The emulator's SwiftShader EGL output can advance the clock while
+        // showing black. Let the Android codec write into the texture surface.
+        vo: _androidEmulator ? 'mediacodec_embed' : null,
+        hwdec: _androidEmulator ? 'mediacodec' : null,
       ),
     );
     subscriptions.addAll([
+      if (_androidEmulator)
+        player.stream.log.listen((log) {
+          if (log.level == 'error' || log.level == 'fatal') {
+            debugPrint('Media ${log.prefix}: ${log.text}');
+          }
+        }),
       player.stream.position.listen(_position),
       player.stream.duration.listen((_) => _update()),
       player.stream.buffering.listen((_) {
@@ -549,27 +566,30 @@ class _TheaterState extends State<Theater> with WidgetsBindingObserver {
                                   Icons.picture_in_picture_alt_rounded,
                                 ),
                               ),
-                            IconButton.filledTonal(
-                              tooltip: context.zh('打开红果官方播放页', '開啟紅果官方播放頁'),
-                              onPressed: () async {
-                                final uri = Uri.https(
-                                  'hongguoduanju.com',
-                                  '/player/${widget.drama.id}${index == 0 ? '' : '/${episode.id}'}',
-                                );
-                                final ok = await launchUrl(
-                                  uri,
-                                  mode: LaunchMode.externalApplication,
-                                );
-                                if (context.mounted && !ok) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: SelectableText(uri.toString()),
-                                    ),
-                                  );
-                                }
-                              },
-                              icon: const Icon(Icons.open_in_new_rounded),
-                            ),
+                            if (episode.page != null)
+                              IconButton.filledTonal(
+                                tooltip: context.zh('打开红果官方播放页', '開啟紅果官方播放頁'),
+                                onPressed: () async {
+                                  final uri = Uri.parse(episode.page!);
+                                  var ok = false;
+                                  try {
+                                    ok = await launchUrl(
+                                      uri,
+                                      mode: LaunchMode.externalApplication,
+                                    );
+                                  } on PlatformException {
+                                    // Keep the verified URL available if the OS declines to open it.
+                                  }
+                                  if (context.mounted && !ok) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: SelectableText(uri.toString()),
+                                      ),
+                                    );
+                                  }
+                                },
+                                icon: const Icon(Icons.open_in_new_rounded),
+                              ),
                           ],
                         ),
                         const Spacer(),

@@ -108,18 +108,24 @@ class Episode {
   final String id;
   final String title;
   final String url;
+  final String? page;
   final List<AdBreak>? adBreaks;
 
   const Episode({
     required this.id,
     required this.title,
     required this.url,
+    this.page,
     this.adBreaks,
   });
 
   @override
   int get hashCode =>
-      id.hashCode ^ title.hashCode ^ url.hashCode ^ adBreaks.hashCode;
+      id.hashCode ^
+      title.hashCode ^
+      url.hashCode ^
+      page.hashCode ^
+      adBreaks.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -129,6 +135,7 @@ class Episode {
           id == other.id &&
           title == other.title &&
           url == other.url &&
+          page == other.page &&
           adBreaks == other.adBreaks;
 }
 

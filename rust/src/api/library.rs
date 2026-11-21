@@ -18,6 +18,7 @@ pub struct Episode {
     pub id: String,
     pub title: String,
     pub url: String,
+    pub page: Option<String>,
     pub ad_breaks: Option<Vec<AdBreak>>,
 }
 
@@ -110,12 +111,17 @@ pub fn parse_catalog(bytes: Vec<u8>) -> Result<Vec<Drama>, String> {
             return Err("drama".into());
         }
         let mut episodes = HashSet::new();
+        let series_page = format!("https://hongguoduanju.com/player/{}", drama.id);
         for ep in &drama.episodes {
             let breaks = ep.ad_breaks.as_deref().unwrap_or_default();
             if !valid_text(&ep.id, 96)
                 || !episodes.insert(&ep.id)
                 || !valid_text(&ep.title, 384)
                 || !valid_address(&ep.url)
+                || ep.page.as_ref().is_some_and(|page| {
+                    !valid_address(page)
+                        || (page != &series_page && page != &format!("{series_page}/{}", ep.id))
+                })
                 || breaks.len() > 64
                 || breaks.iter().any(|b| b.start_ms >= b.end_ms)
                 || breaks

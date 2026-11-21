@@ -54,6 +54,16 @@ fn catalog_rejects_ambiguous_ids_and_non_https() {
     let drama = r#"{"id":"s","title":"剧","tags":["A"],"episodes":[{"id":"e","title":"一","url":"https://cdn.example.org/v.mp4"}]}"#;
     let input = |rows: &str| format!(r#"{{"version":1,"dramas":[{rows}]}}"#).into_bytes();
     assert_eq!(parse_catalog(input(drama)).unwrap().len(), 1);
+    let linked =
+        |page: &str| input(&drama.replace("\"url\":", &format!("\"page\":\"{page}\",\"url\":")));
+    let page = "https://hongguoduanju.com/player/s/e";
+    assert_eq!(
+        parse_catalog(linked(page)).unwrap()[0].episodes[0]
+            .page
+            .as_deref(),
+        Some(page)
+    );
+    assert!(parse_catalog(linked("https://hongguoduanju.com/player/s/other")).is_err());
     assert!(parse_catalog(input(&format!("{drama},{drama}"))).is_err());
     let marked = |ranges: &str| {
         input(&drama.replace("\"url\":", &format!("\"ad_breaks\":{ranges},\"url\":")))
