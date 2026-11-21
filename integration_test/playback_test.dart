@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:material_ui/material_ui.dart';
@@ -26,9 +28,43 @@ class _TestPreferences extends SharedPreferencesAsync {
 void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   setUpAll(() async {
-    // Keep the platform's accessibility request stable while native fullscreen
-    // windows gain and lose focus. Exercise the accessible controls throughout.
-    binding.platformDispatcher.semanticsEnabledTestValue = true;
+    if (Platform.isWindows) {
+      // Let Windows create its native accessibility tree before Flutter sends
+      // the home screen. A Dart-only override can leave the engine without a root.
+      final policy = binding.framePolicy;
+      binding.framePolicy = LiveTestWidgetsFlutterBindingFramePolicy.fullyLive;
+      try {
+        runApp(const SizedBox.shrink());
+        await binding.waitUntilFirstFrameRasterized.timeout(
+          const Duration(seconds: 10),
+        );
+        final request = await Process.run('powershell.exe', [
+          '-NoProfile',
+          '-NonInteractive',
+          '-Command',
+          '''
+          Add-Type -AssemblyName UIAutomationClient
+          \$window = [System.Windows.Automation.AutomationElement]::FromHandle((Get-Process -Id $pid).MainWindowHandle)
+          \$null = \$window.FindAll([System.Windows.Automation.TreeScope]::Descendants, [System.Windows.Automation.Condition]::TrueCondition)
+        ''',
+        ]);
+        expect(request.exitCode, 0, reason: request.stderr.toString());
+        final deadline = Stopwatch()..start();
+        while (!binding.platformDispatcher.semanticsEnabled &&
+            deadline.elapsed < const Duration(seconds: 5)) {
+          await Future<void>.delayed(const Duration(milliseconds: 20));
+        }
+        expect(
+          binding.platformDispatcher.semanticsEnabled,
+          isTrue,
+          reason: 'Windows did not request accessibility',
+        );
+      } finally {
+        binding.framePolicy = policy;
+      }
+    } else {
+      binding.platformDispatcher.semanticsEnabledTestValue = true;
+    }
     await RustLib.init();
     await initializePlayback();
   });
@@ -137,7 +173,8 @@ void main() {
       }
       await tester.pump();
       final slider = tester.widget<Slider>(find.byType(Slider));
-      final target = (slider.max * .75).round();
+      // Leave time to measure playback after restoring even a short preview.
+      final target = (slider.max * .65).round();
       slider.onChangeEnd!(target.toDouble());
       await until(
         'Seek failed',
@@ -158,9 +195,19 @@ void main() {
       expect(progress.watchedMs, inExclusiveRange(0, target));
       await open(restored, id);
       await until(
+        'Missing restored frame',
+        () => player().state.position.inMilliseconds > 0,
+      );
+      final firstPosition = player().state.position.inMilliseconds;
+      expect(
+        firstPosition,
+        closeTo(progress.positionMs, 900),
+        reason: 'First position after restoring ${progress.positionMs} ms',
+      );
+      await until(
         'Resume failed',
         () =>
-            player().state.position.inMilliseconds >= progress.positionMs &&
+            player().state.position.inMilliseconds >= firstPosition + 500 &&
             player().state.playing,
       );
       await close();

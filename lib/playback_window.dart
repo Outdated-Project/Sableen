@@ -29,7 +29,21 @@ Future<bool> videoInSmallWindow() async {
       await displayChannel.invokeMethod<bool>('isPip') == true;
 }
 
+Future<void> _macWindowChange = Future<void>.value();
+
 Future<void> setTheaterFullscreen(bool enabled) async {
+  if (!kIsWeb && defaultTargetPlatform == TargetPlatform.macOS) {
+    // A second card can open while the first window is still leaving fullscreen.
+    _macWindowChange = _macWindowChange.then((_) async {
+      try {
+        await const MethodChannel('sableen/video')
+            .invokeMethod<bool>('setFullscreen', enabled);
+      } on PlatformException catch (error) {
+        debugPrint('macOS fullscreen request failed: $error');
+      }
+    });
+    return _macWindowChange;
+  }
   if (!kIsWeb &&
       (androidVideo || defaultTargetPlatform == TargetPlatform.iOS)) {
     await SystemChrome.setEnabledSystemUIMode(

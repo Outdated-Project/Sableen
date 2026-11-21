@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'design.dart';
@@ -24,6 +25,7 @@ class _HomeState extends State<Home> {
   final search = TextEditingController();
   late Future<List<Drama>> ranked;
   Library get library => widget.library;
+  bool enteringTheater = false;
   @override
   void initState() {
     super.initState();
@@ -44,6 +46,7 @@ class _HomeState extends State<Home> {
   }
 
   Future<void> _watch(Drama d) async {
+    if (enteringTheater) return;
     final last = library.latest(d.id);
     var i = d.episodes.indexWhere((e) => e.id == last?.episode);
     if (i < 0) {
@@ -51,7 +54,18 @@ class _HomeState extends State<Home> {
     } else if (last!.completed && i + 1 < d.episodes.length) {
       i++;
     }
-    unawaited(setTheaterFullscreen(true));
+    final fullscreen = setTheaterFullscreen(true);
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.macOS) {
+      enteringTheater = true;
+      try {
+        await fullscreen;
+      } finally {
+        enteringTheater = false;
+      }
+      if (!mounted) return;
+    } else {
+      unawaited(fullscreen);
+    }
     await Navigator.push(
       context,
       MaterialPageRoute(
