@@ -58,6 +58,27 @@ def check(record):
             decode_end(asset, duration)
         # A plausible header can outlast the decodable video.
         decode_end(path, measured)
+    sizes = set()
+    for encoding in episode.get('encodings', []):
+        url = encoding['url']
+        if url not in urls:
+            raise ValueError(f'Unlisted encoding on {page}')
+        if url == media:
+            fields = {'sha256': episode['sha256'], 'bytes': episode['bytes']}
+            w, h = width, height
+        else:
+            with media_snapshot(url) as path:
+                duration, w, h, tag = video_track(path)
+                if (abs(duration - measured) > 250 or tag != 'avc1'
+                        or (abs(duration - listed) <= 1000) != (abs(measured - listed) <= 1000)):
+                    raise ValueError(f'Non-interchangeable encoding on {page}')
+                decode_end(path, duration)
+                fields = fingerprint(path)
+        if (w, h) in sizes or encoding != {'url': url, 'width': w, 'height': h, **fields}:
+            raise ValueError(f'Encoding dimensions or bytes changed on {page}')
+        sizes.add((w, h))
+    if sizes and (len(sizes) < 2 or media not in {e['url'] for e in episode['encodings']}):
+        raise ValueError(f'Invalid default encoding on {page}')
     if abs(measured - episode['durationMs']) > 250 or listed != episode['listedMs']:
         raise ValueError(f'Media duration changed on {page}')
     full = listed > 0 and abs(listed - measured) <= 1000
@@ -103,6 +124,11 @@ def main():
                 if type(count) is not int or count < 1 or drama.get('episode_count') != count:
                     raise ValueError(f'Invalid or stale episode count for {drama["id"]}')
                 series_tracks = by_series[drama['id']]
+                ids = season['published_ids']
+                if drama.get('published_ids') != ids or any(
+                        not 1 <= t['episode_number'] <= count or ids[t['episode_number']-1] != t['episode_id']
+                        for t in series_tracks):
+                    raise ValueError(f'Stale episode identity or order for {drama["id"]}')
                 complete += complete_series(series_tracks, count)
                 for t in series_tracks:
                     t['listed_episodes'] = count

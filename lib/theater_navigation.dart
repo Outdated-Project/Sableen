@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'package:material_ui/material_ui.dart';
 
 import 'design.dart';
@@ -17,177 +19,185 @@ class TheaterNavigation extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final solid = mode == Glass.solid || MediaQuery.highContrastOf(context);
+    final opaque = mode == Glass.solid || MediaQuery.highContrastOf(context);
+    final dark = colors.brightness == Brightness.dark;
     final aero = mode == Glass.aero;
     final liquid = mode == Glass.liquid;
-    final dark = colors.brightness == Brightness.dark;
-    final radius = BorderRadius.circular(aero ? 0 : 34);
     final tint = Color.alphaBlend(
-      colors.primary.withValues(alpha: aero ? .10 : .035),
+      colors.primary.withValues(alpha: aero ? .14 : .025),
       colors.surface,
     );
-    final highlight = Colors.white.withValues(alpha: dark ? .19 : .72);
-    const four = 4;
-    final bar = ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 480),
-      child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: aero ? 8 : 4, vertical: 4),
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: AnimatedAlign(
-                duration: motion(context),
-                curve: fluidCurve,
-                alignment: Alignment(-1 + 2 * index / (four - 1), 0),
-                child: FractionallySizedBox(
-                  widthFactor: 1 / four,
-                  heightFactor: 1,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: colors.primaryContainer,
-                      borderRadius: BorderRadius.circular(aero ? 9 : 30),
-                      border: Border.all(
-                        color: colors.primary.withValues(
-                          alpha: solid ? .45 : .32,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            NavigationBarTheme(
-              data: NavigationBarThemeData(
-                labelTextStyle: WidgetStateProperty.resolveWith(
-                  (s) => TextStyle(
-                    fontSize: 12,
-                    height: 1.2,
-                    fontWeight: s.contains(WidgetState.selected)
-                        ? FontWeight.w700
-                        : FontWeight.w500,
-                    color: s.contains(WidgetState.selected)
-                        ? colors.onPrimaryContainer
-                        : colors.onSurface,
-                  ),
-                ),
-                iconTheme: WidgetStateProperty.resolveWith(
-                  (s) => IconThemeData(
-                    size: 21,
-                    color: s.contains(WidgetState.selected)
-                        ? colors.primary
-                        : colors.onSurface,
-                  ),
-                ),
-              ),
-              child: NavigationBar(
-                height: 56,
-                selectedIndex: index,
-                onDestinationSelected: select,
-                backgroundColor: Colors.transparent,
-                elevation: 0,
-                indicatorColor: Colors.transparent,
-                animationDuration: motion(context),
-                destinations: [
-                  for (final (label, icon, active) in [
-                    (
-                      context.zh('剧场', '劇場'),
-                      Icons.movie_outlined,
-                      Icons.movie_rounded,
-                    ),
-                    (
-                      context.zh('历史纪录', '歷史紀錄'),
-                      Icons.history_outlined,
-                      Icons.history_rounded,
-                    ),
-                    (
-                      context.zh('下载', '下載'),
-                      Icons.file_download_outlined,
-                      Icons.file_download_rounded,
-                    ),
-                    (
-                      context.zh('设置', '設定'),
-                      Icons.settings_outlined,
-                      Icons.settings_rounded,
-                    ),
-                  ])
-                    NavigationDestination(
-                      label: label,
-                      icon: Icon(icon),
-                      selectedIcon: Icon(active),
-                    ),
-                ],
-              ),
-            ),
-          ],
+    final fill = opaque
+        ? colors.surfaceContainerHigh
+        : tint.withValues(alpha: liquid ? (dark ? .70 : .65) : .72);
+    final theme = NavigationBarThemeData(
+      indicatorColor: colors.primaryContainer,
+      indicatorShape: const StadiumBorder(),
+      labelTextStyle: WidgetStateProperty.resolveWith((states) {
+        final selected = states.contains(WidgetState.selected);
+        return Theme.of(context).textTheme.labelMedium?.copyWith(
+          color: colors.onSurface,
+          fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+        );
+      }),
+      iconTheme: WidgetStateProperty.resolveWith(
+        (states) => IconThemeData(
+          size: 22,
+          color: states.contains(WidgetState.selected)
+              ? colors.onPrimaryContainer
+              : colors.onSurface,
         ),
       ),
     );
-    final surface = DecoratedBox(
+    final controls = DecoratedBox(
       decoration: BoxDecoration(
-        color: solid
-            ? colors.surfaceContainerHigh
-            : aero
-            ? null
-            : tint.withValues(alpha: liquid ? .63 : .78),
-        gradient: aero && !solid
+        color: (aero || liquid) && !opaque ? null : fill,
+        gradient: (aero || liquid) && !opaque
             ? LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  Color.alphaBlend(
-                    highlight.withValues(alpha: .16),
-                    tint,
-                  ).withValues(alpha: .82),
-                  tint.withValues(alpha: .72),
+                  if (aero)
+                    Color.alphaBlend(
+                      Colors.white.withValues(alpha: dark ? .18 : .35),
+                      tint,
+                    ).withValues(alpha: .8)
+                  else
+                    fill,
+                  fill,
+                  tint.withValues(alpha: dark ? .82 : .74),
                 ],
+                stops: const [0, .48, .73],
               )
             : null,
-        borderRadius: radius,
-        border: aero
-            ? Border(top: BorderSide(color: highlight))
-            : Border.all(color: solid ? colors.outlineVariant : highlight),
       ),
-      child: Align(widthFactor: aero ? null : 1, heightFactor: 1, child: bar),
-    );
-    final sigma = liquid
-        ? 5.0
-        : aero
-        ? 12.0
-        : 9.0;
-    final material = ClipRRect(
-      borderRadius: radius,
-      child: solid
-          ? surface
-          : BackdropFilter(
-              // Resolve the sample rectangle at paint time in the toolbar's own coordinate space.
-              filterConfig: ImageFilterConfig.blur(
-                sigmaX: sigma,
-                sigmaY: sigma,
-                bounded: true,
+      child: NavigationBarTheme(
+        data: theme,
+        child: NavigationBar(
+          selectedIndex: index,
+          onDestinationSelected: select,
+          height: 66,
+          backgroundColor: Colors.transparent,
+          surfaceTintColor: Colors.transparent,
+          shadowColor: Colors.transparent,
+          elevation: 0,
+          animationDuration: motion(context),
+          destinations: [
+            for (final (title, icon, active) in [
+              (
+                context.zh('剧场', '劇場'),
+                Icons.movie_outlined,
+                Icons.movie_rounded,
               ),
-              child: surface,
-            ),
+              (
+                context.zh('历史纪录', '歷史紀錄'),
+                Icons.history_outlined,
+                Icons.history_rounded,
+              ),
+              (
+                context.zh('下载', '下載'),
+                Icons.file_download_outlined,
+                Icons.file_download_rounded,
+              ),
+              (
+                context.zh('设置', '設定'),
+                Icons.settings_outlined,
+                Icons.settings_rounded,
+              ),
+            ])
+              NavigationDestination(
+                label: title,
+                icon: Icon(icon),
+                selectedIcon: Icon(active),
+              ),
+          ],
+        ),
+      ),
     );
+    final blur = ImageFilterConfig.blur(
+      sigmaX: liquid ? 10 : 12,
+      sigmaY: liquid ? 10 : 12,
+      bounded: true,
+    );
+    // Restore some chroma lost to the blur without changing neutral backgrounds.
+    const saturation = ui.ColorFilter.matrix(<double>[
+      1.16,
+      -.14,
+      -.02,
+      0,
+      0,
+      -.04,
+      1.06,
+      -.02,
+      0,
+      0,
+      -.04,
+      -.14,
+      1.18,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+    ]);
     return Padding(
-      padding: aero
-          ? EdgeInsets.zero
-          : const EdgeInsets.fromLTRB(12, 0, 12, 10),
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
       child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: aero ? double.infinity : 480),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            borderRadius: radius,
-            boxShadow: [
-              BoxShadow(
-                color: colors.shadow.withValues(alpha: dark ? .26 : .14),
-                blurRadius: aero ? 5 : 12,
-                offset: Offset(0, aero ? -1 : 3),
-              ),
-            ],
+        constraints: const BoxConstraints(maxWidth: 480),
+        child: CustomPaint(
+          foregroundPainter: _GlassRim(
+            opaque
+                ? colors.outlineVariant
+                : Colors.white.withValues(alpha: dark ? .56 : .9),
+            opaque
+                ? colors.outlineVariant
+                : colors.shadow.withValues(alpha: dark ? .3 : .18),
           ),
-          child: material,
+          child: ClipPath(
+            clipper: const ShapeBorderClipper(shape: StadiumBorder()),
+            child: opaque
+                ? controls
+                : BackdropFilter(
+                    filterConfig: liquid
+                        ? ImageFilterConfig.compose(
+                            inner: blur,
+                            outer: const ImageFilterConfig(saturation),
+                          )
+                        : blur,
+                    child: controls,
+                  ),
+          ),
         ),
       ),
     );
   }
+}
+
+class _GlassRim extends CustomPainter {
+  const _GlassRim(this.light, this.shade);
+  final Color light;
+  final Color shade;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = (Offset.zero & size).deflate(.6);
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.2
+      ..shader = LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [light, shade, light],
+        stops: const [0, .58, 1],
+      ).createShader(rect);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(rect, Radius.circular(rect.shortestSide / 2)),
+      paint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_GlassRim old) => old.light != light || old.shade != shade;
 }

@@ -5,7 +5,7 @@ const path = require('node:path');
 const { chromium } = require('playwright-core');
 
 const root = path.resolve(process.argv[2]);
-const mime = { '.html': 'text/html', '.js': 'text/javascript', '.wasm': 'application/wasm', '.json': 'application/json' };
+const mime = { '.html': 'text/html', '.js': 'text/javascript', '.wasm': 'application/wasm', '.mp4': 'video/mp4', '.json': 'application/json' };
 let disconnected = false;
 const server = http.createServer((req, res) => {
   if (disconnected) { req.socket.destroy(); return; }
@@ -15,8 +15,20 @@ const server = http.createServer((req, res) => {
     res.writeHead(404).end();
     return;
   }
-  res.writeHead(200, { 'Content-Type': mime[path.extname(file)] || 'application/octet-stream',
-    'Cross-Origin-Opener-Policy': 'same-origin', 'Cross-Origin-Embedder-Policy': 'credentialless' });
+  const size = fs.statSync(file).size;
+  const headers = { 'Content-Type': mime[path.extname(file)] || 'application/octet-stream',
+    'Content-Length': size, 'Accept-Ranges': 'bytes',
+    'Cross-Origin-Opener-Policy': 'same-origin', 'Cross-Origin-Embedder-Policy': 'credentialless' };
+  if (req.headers.range) {
+    const range = /^bytes=(\d+)-(\d*)$/.exec(req.headers.range);
+    const start = range ? Number(range[1]) : size;
+    const end = range?.[2] ? Math.min(size - 1, Number(range[2])) : size - 1;
+    if (start > end) return res.writeHead(416, {'Content-Range': `bytes */${size}`}).end();
+    res.writeHead(206, {...headers, 'Content-Range': `bytes ${start}-${end}/${size}`, 'Content-Length': end - start + 1});
+    fs.createReadStream(file, {start, end}).pipe(res);
+    return;
+  }
+  res.writeHead(200, headers);
   fs.createReadStream(file).pipe(res);
 });
 
@@ -43,6 +55,7 @@ async function test() {
     assert(Math.abs(firstRow[0].y - firstRow[1].y) < 2 && firstRow[0].x < firstRow[1].x);
     await page.getByRole('button', { name: '切换为单列' }).press('Enter');
     await page.getByRole('button', { name: '切换为双列' }).press('Enter');
+    const savedSizes = new Map();
     for (const [publisher, title, episode, total] of titles) {
       console.log('Testing', publisher, title);
       await page.getByRole('checkbox', { name: publisher }).press('Space');
@@ -53,8 +66,9 @@ async function test() {
       }, null, { timeout: 45000 });
       await page.mouse.move(80, 60);
       await page.getByRole('button', { name: '选集' }).press('Enter');
-      await page.getByText(`全 ${total} 集 · 当前可播放 `, { exact: false }).first().waitFor();
+      await page.getByText(`全 ${total} 集 · 正片 `, { exact: false }).first().waitFor();
       await page.keyboard.press('Escape');
+      let saved = episode;
       if (publisher === '红果漫剧' && await page.evaluate(() => document.pictureInPictureEnabled)) {
         await page.mouse.move(80, 80);
         await page.getByRole('button', { name: '小窗播放' }).press('Enter');
@@ -71,14 +85,30 @@ async function test() {
         await page.getByRole('button', { name: new RegExp(title) }).first().press('Enter');
         await page.waitForFunction(() => { const v = document.querySelector('video'); return v?.currentTime >= v?.duration * .45; }, null, { timeout: 4500 });
       }
+      if (episode.encodings?.length > 1) {
+        const alternate = episode.encodings.find(f => f.sha256 !== episode.sha256);
+        await page.mouse.move(110, 90);
+        await page.getByRole('button', { name: '暂停', exact: true }).last().press('Enter');
+        await page.waitForFunction(() => document.querySelector('video')?.paused === true);
+        const before = await page.locator('video').first().evaluate(v => ({w: v.videoWidth, h: v.videoHeight, time: v.currentTime}));
+        await page.getByRole('button', { name: `${before.w}×${before.h}`, exact: true }).press('Enter');
+        await page.getByText(`${alternate.width}×${alternate.height}`, {exact: true}).last().click();
+        await page.waitForFunction(({width, height, time}) => {
+          const v = document.querySelector('video');
+          return v?.paused && v.videoWidth === width && v.videoHeight === height && Math.abs(v.currentTime - time) < .75;
+        }, {...alternate, time: before.time});
+        saved = alternate;
+        savedSizes.set(title, [alternate.width, alternate.height]);
+      }
       await page.mouse.move(70, 70);
       await page.getByRole('button', { name: '离线下载' }).first().press('Enter');
       await page.getByRole('button', { name: `下载 ${episode.title}`, exact: true }).press('Enter');
-      await page.getByRole('group', { name: `${title} · ${episode.title} 已保存`, exact: true }).waitFor();
+      const suffix = savedSizes.has(title) ? ` · ${saved.width}×${saved.height}` : '';
+      await page.getByRole('group', { name: `${title} · ${episode.title}${suffix} 已保存`, exact: true }).waitFor();
       await page.waitForFunction(async hash => {
         const cache = await caches.open('sableen-episodes-v1');
         return !!(await cache.match(new URL(`media/${hash}.mp4`, document.baseURI)));
-      }, renditions[episode.sha256]?.sha256 ?? episode.sha256);
+      }, renditions[saved.sha256]?.sha256 ?? saved.sha256);
       await page.keyboard.press('Escape');
       await page.mouse.move(100, 70);
       assert.equal(page.context().pages().length, 1);
@@ -104,6 +134,9 @@ async function test() {
         const v = document.querySelector('video');
         return v?.currentSrc.startsWith('blob:') && v.videoWidth > 0 && v.currentTime > .5;
       });
+      if (savedSizes.has(title)) {
+        assert.deepEqual(await offlinePage.locator('video').first().evaluate(v => [v.videoWidth, v.videoHeight]), savedSizes.get(title));
+      }
       await offlinePage.mouse.move(80, 60);
       await offlinePage.getByRole('button', { name: '返回', exact: true }).first().evaluate(el => el.click());
     }

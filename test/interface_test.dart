@@ -28,77 +28,146 @@ void main() {
     final boundary = GlobalKey();
     final controller = ScrollController();
     addTearDown(controller.dispose);
-    for (final mode in [Glass.aero, Glass.liquid]) {
+    for (final brightness in Brightness.values) {
+      for (final mode in [Glass.aero, Glass.liquid]) {
+        final theme = theaterTheme(brightness, null, Palette.monet);
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: theme,
+            home: Scaffold(
+              body: Center(
+                child: RepaintBoundary(
+                  key: boundary,
+                  child: SizedBox(
+                    width: 360,
+                    height: 300,
+                    child: Stack(
+                      children: [
+                        ListView(
+                          controller: controller,
+                          padding: EdgeInsets.zero,
+                          children: const [
+                            SizedBox(
+                              height: 220,
+                              child: ColoredBox(color: Colors.blue),
+                            ),
+                            SizedBox(
+                              height: 100,
+                              child: ColoredBox(color: Color(0xffff0000)),
+                            ),
+                            SizedBox(
+                              height: 100,
+                              child: ColoredBox(color: Color(0xff00ff00)),
+                            ),
+                            SizedBox(
+                              height: 100,
+                              child: ColoredBox(color: Colors.white),
+                            ),
+                            SizedBox(
+                              height: 100,
+                              child: ColoredBox(color: Colors.black),
+                            ),
+                          ],
+                        ),
+                        Align(
+                          alignment: Alignment.bottomCenter,
+                          child: TheaterNavigation(
+                            mode: mode,
+                            index: 0,
+                            select: (_) {},
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        Future<Color> sample(double offset, {int x = 180, int y = 263}) async {
+          controller.jumpTo(offset);
+          await tester.pumpAndSettle();
+          final layer =
+              boundary.currentContext!.findRenderObject()
+                  as RenderRepaintBoundary;
+          final pixels = await tester.runAsync(() async {
+            final image = await layer.toImage();
+            try {
+              return await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+            } finally {
+              image.dispose();
+            }
+          });
+          // Inside the transparent bar, between two destination icons.
+          final start = 4 * (y * 360 + x);
+          return Color.fromARGB(
+            255,
+            pixels!.getUint8(start),
+            pixels.getUint8(start + 1),
+            pixels.getUint8(start + 2),
+          );
+        }
+
+        final red = await sample(0);
+        final green = await sample(100);
+        expect(red.r - green.r, greaterThan(18 / 255), reason: mode.name);
+        expect(green.g - red.g, greaterThan(18 / 255), reason: mode.name);
+        expect(
+          await sample(0, x: 14, y: 226),
+          const Color(0xffff0000),
+          reason: 'The upper corner is outside the stadium',
+        );
+        for (final offset in [200.0, 300.0]) {
+          final bg = await sample(offset, y: 274);
+          final a = theme.colorScheme.onSurface.computeLuminance(),
+              b = bg.computeLuminance();
+          expect(
+            a > b ? (a + .05) / (b + .05) : (b + .05) / (a + .05),
+            greaterThanOrEqualTo(4.5),
+            reason:
+                '$mode $brightness at $offset: $bg vs ${theme.colorScheme.onSurface} on ${theme.colorScheme.surface}',
+          );
+        }
+      }
+    }
+  });
+  testWidgets(
+    'High contrast makes Liquid opaque and reduced motion disables tab animation',
+    (tester) async {
       await tester.pumpWidget(
         MaterialApp(
-          home: Scaffold(
-            body: Center(
-              child: RepaintBoundary(
-                key: boundary,
-                child: SizedBox(
-                  width: 360,
-                  height: 300,
-                  child: Stack(
-                    children: [
-                      ListView(
-                        controller: controller,
-                        padding: EdgeInsets.zero,
-                        children: const [
-                          SizedBox(
-                            height: 220,
-                            child: ColoredBox(color: Colors.blue),
-                          ),
-                          SizedBox(
-                            height: 100,
-                            child: ColoredBox(color: Color(0xffff0000)),
-                          ),
-                          SizedBox(
-                            height: 100,
-                            child: ColoredBox(color: Color(0xff00ff00)),
-                          ),
-                        ],
-                      ),
-                      Align(
-                        alignment: Alignment.bottomCenter,
-                        child: TheaterNavigation(
-                          mode: mode,
-                          index: 0,
-                          select: (_) {},
-                        ),
-                      ),
-                    ],
-                  ),
+          home: MediaQuery(
+            data: const MediaQueryData(
+              highContrast: true,
+              disableAnimations: true,
+            ),
+            child: Scaffold(
+              body: Align(
+                alignment: Alignment.bottomCenter,
+                child: TheaterNavigation(
+                  mode: Glass.liquid,
+                  index: 0,
+                  select: (_) {},
                 ),
               ),
             ),
           ),
         ),
       );
-      Future<List<int>> sample(double offset) async {
-        controller.jumpTo(offset);
-        await tester.pumpAndSettle();
-        final layer =
-            boundary.currentContext!.findRenderObject()
-                as RenderRepaintBoundary;
-        final pixels = await tester.runAsync(() async {
-          final image = await layer.toImage();
-          try {
-            return await image.toByteData(format: ui.ImageByteFormat.rawRgba);
-          } finally {
-            image.dispose();
-          }
-        });
-        // Inside the transparent bar, between two destination icons.
-        final start = 4 * (263 * 360 + 180);
-        return pixels!.buffer.asUint8List(pixels.offsetInBytes + start, 3);
-      }
-
-      final red = await sample(0);
-      final green = await sample(100);
-      expect(red[0] - green[0], greaterThan(18), reason: mode.name);
-      expect(green[1] - red[1], greaterThan(18), reason: mode.name);
-    }
-  });
+      final root = find.byType(TheaterNavigation);
+      expect(
+        find.descendant(of: root, matching: find.byType(BackdropFilter)),
+        findsNothing,
+      );
+      expect(
+        tester
+            .widget<NavigationBar>(find.byType(NavigationBar))
+            .animationDuration,
+        Duration.zero,
+      );
+    },
+  );
   testWidgets(
     'Compact and wide layouts expose history and persist the chosen glass',
     (tester) async {
@@ -126,6 +195,13 @@ void main() {
         expect(find.text('沒有符合的劇目'), findsOneWidget);
         expect(find.text('猜你喜歡'), findsOneWidget);
         expect(find.byType(NavigationDestination), findsNWidgets(4));
+        await settings.save('glass', 'aero');
+        await tester.pumpAndSettle();
+        final bar = tester.getRect(find.byType(NavigationBar));
+        expect(bar.width, width == 360 ? 336 : 480);
+        expect(bar.height, 66);
+        expect(bar.center.dx, width / 2);
+        expect(bar.bottom, 750);
         await tester.tap(find.text('歷史紀錄'));
         await tester.pumpAndSettle();
         expect(find.text('還沒有觀看紀錄'), findsOneWidget);

@@ -23,6 +23,7 @@ class Publication(HTMLParser):
         super().__init__(convert_charrefs=True)
         self.nodes = []
         self.public_video = {}
+        self.series_detail = {}
         self.script_type = None
         self.feed(page)
         self.close()
@@ -42,6 +43,9 @@ class Publication(HTMLParser):
             self.nodes.extend(obj.get('@graph', [obj]))
         elif self.script_type == '' and data.lstrip().startswith('_ROUTER_DATA = '):
             state, _ = json.JSONDecoder().raw_decode(data.lstrip()[len('_ROUTER_DATA = '):])
+            detail = state.get('loaderData', {}).get('detail_page', {}).get('seriesDetail')
+            if isinstance(detail, dict):
+                self.series_detail = detail
             for route in state.get('loaderData', {}).values():
                 if isinstance(route, dict) and isinstance(route.get('publicVideoSeo'), dict):
                     self.public_video = route['publicVideoSeo']
@@ -160,8 +164,35 @@ def published_series(detail):
     match = re.fullmatch(re.escape(HONGGUO) + r'/detail\?series_id=(\d+)', detail)
     if not match:
         return None
-    return next((n for n in publication(detail).nodes if n.get('url') == detail
+    doc = publication(detail)
+    series = next((n for n in doc.nodes if n.get('url') == detail
                    and n.get('@type') in ('TVSeries', 'TVSeason') and n.get('episode')), None)
+    if series is None:
+        return None
+    metadata = doc.series_detail
+    ids = metadata.get('vid_list')
+    if (metadata.get('series_id') != match[1] or not isinstance(ids, list)
+            or len(ids) != series.get('numberOfEpisodes') or not ids
+            or not all(isinstance(item, str) and re.fullmatch('[0-9]+', item) for item in ids)
+            or len(set(ids)) != len(ids)):
+        raise ValueError(f'Invalid published episode list for {detail}')
+    return {**series, 'published_ids': ids}
+
+
+def quality_files(primary, verified, listed):
+    """Keep one interchangeable file per decoded size, with the default first."""
+    _, duration, _, _, _, _ = primary
+    sizes = set()
+    files = []
+    for candidate in [primary, *verified]:
+        url, actual, width, height, evidence, codec = candidate
+        if ((width, height) in sizes or abs(actual - duration) > 250
+                or (listed and (abs(actual - listed) <= 1000) != (abs(duration - listed) <= 1000))
+                or (candidate != primary and codec != 'avc1')):
+            continue
+        files.append({'width': width, 'height': height, 'url': url, **evidence})
+        sizes.add((width, height))
+    return files if len(files) > 1 else []
 
 
 def hongguo_title(item):
@@ -183,6 +214,8 @@ def hongguo_title(item):
         item_id, number, video = resolved
         if item_id in used or number != entry['episodeNumber'] or entry['@id'] != page + '#episode':
             continue
+        if not 1 <= number <= len(series['published_ids']) or series['published_ids'][number-1] != item_id:
+            raise ValueError(f'Episode order changed for {page}')
         total = listed_ms(video)
         verified = []
         for url in public_encodings(video, item_id):
@@ -195,9 +228,10 @@ def hongguo_title(item):
         if not verified:
             raise ValueError(f'No usable published media on {page}')
         # Prefer a full episode, then the highest measured resolution.
-        media, actual, _, _, evidence, codec = max(verified, key=lambda v: (
+        primary = max(verified, key=lambda v: (
             bool(total) and abs(v[1] - total) <= 1000,
             min(v[2:4]) >= 1080 and max(v[2:4]) >= 1920, v[2] * v[3], v[1]))
+        media, actual, _, _, evidence, codec = primary
         mirrors = [url for url, _, _, _, other, _ in verified if url != media and other == evidence][:3]
         label = f'第{number}集'
         if not total or abs(actual - total) > 1000:
@@ -205,6 +239,8 @@ def hongguo_title(item):
         episodes.append({'id': item_id, 'title': label, 'url': media, 'page': page,
                          'durationMs': actual, 'listedMs': total, **evidence,
                          **({'mirrors': mirrors} if mirrors else {})})
+        if choices := quality_files(primary, verified, total):
+            episodes[-1]['encodings'] = choices
         if codec == 'bvc2':
             from transcode_bytevc2 import prepare_rendition
             episodes[-1]['_rendition'] = prepare_rendition(media, evidence, ROOT.parent / 'renditions')
@@ -212,7 +248,8 @@ def hongguo_title(item):
         tags.extend(video.get('genre') or [])
     if episodes:
         return {'id': series_id, 'title': series['name'], 'tags': list(dict.fromkeys(tags)) or ['短剧'],
-                'cover': item.get('image'), 'episode_count': series.get('numberOfEpisodes'), 'episodes': episodes}
+                'cover': item.get('image'), 'episode_count': series.get('numberOfEpisodes'),
+                'published_ids': series['published_ids'], 'episodes': episodes}
     return None
 
 

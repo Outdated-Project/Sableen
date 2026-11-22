@@ -303,6 +303,7 @@ impl SseDecode for crate::api::library::Drama {
         let mut var_tags = <Vec<String>>::sse_decode(deserializer);
         let mut var_cover = <Option<String>>::sse_decode(deserializer);
         let mut var_episodeCount = <Option<u32>>::sse_decode(deserializer);
+        let mut var_publishedIds = <Option<Vec<String>>>::sse_decode(deserializer);
         let mut var_episodes = <Vec<crate::api::library::Episode>>::sse_decode(deserializer);
         return crate::api::library::Drama {
             id: var_id,
@@ -310,6 +311,7 @@ impl SseDecode for crate::api::library::Drama {
             tags: var_tags,
             cover: var_cover,
             episode_count: var_episodeCount,
+            published_ids: var_publishedIds,
             episodes: var_episodes,
         };
     }
@@ -325,6 +327,10 @@ impl SseDecode for crate::api::library::Episode {
         let mut var_bytes = <Option<u32>>::sse_decode(deserializer);
         let mut var_sha256 = <Option<String>>::sse_decode(deserializer);
         let mut var_mirrors = <Option<Vec<String>>>::sse_decode(deserializer);
+        let mut var_encodings =
+            <Option<Vec<crate::api::library::VideoEncoding>>>::sse_decode(deserializer);
+        let mut var_durationMs = <Option<u32>>::sse_decode(deserializer);
+        let mut var_listedMs = <Option<u32>>::sse_decode(deserializer);
         let mut var_adBreaks =
             <Option<Vec<crate::api::library::AdBreak>>>::sse_decode(deserializer);
         return crate::api::library::Episode {
@@ -335,6 +341,9 @@ impl SseDecode for crate::api::library::Episode {
             bytes: var_bytes,
             sha256: var_sha256,
             mirrors: var_mirrors,
+            encodings: var_encodings,
+            duration_ms: var_durationMs,
+            listed_ms: var_listedMs,
             ad_breaks: var_adBreaks,
         };
     }
@@ -424,6 +433,20 @@ impl SseDecode for Vec<crate::api::library::Progress> {
     }
 }
 
+impl SseDecode for Vec<crate::api::library::VideoEncoding> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::library::VideoEncoding>::sse_decode(
+                deserializer,
+            ));
+        }
+        return ans_;
+    }
+}
+
 impl SseDecode for Option<String> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -462,6 +485,19 @@ impl SseDecode for Option<Vec<crate::api::library::AdBreak>> {
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         if (<bool>::sse_decode(deserializer)) {
             return Some(<Vec<crate::api::library::AdBreak>>::sse_decode(
+                deserializer,
+            ));
+        } else {
+            return None;
+        }
+    }
+}
+
+impl SseDecode for Option<Vec<crate::api::library::VideoEncoding>> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<Vec<crate::api::library::VideoEncoding>>::sse_decode(
                 deserializer,
             ));
         } else {
@@ -509,6 +545,24 @@ impl SseDecode for u8 {
 impl SseDecode for () {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {}
+}
+
+impl SseDecode for crate::api::library::VideoEncoding {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_width = <u32>::sse_decode(deserializer);
+        let mut var_height = <u32>::sse_decode(deserializer);
+        let mut var_url = <String>::sse_decode(deserializer);
+        let mut var_bytes = <u32>::sse_decode(deserializer);
+        let mut var_sha256 = <String>::sse_decode(deserializer);
+        return crate::api::library::VideoEncoding {
+            width: var_width,
+            height: var_height,
+            url: var_url,
+            bytes: var_bytes,
+            sha256: var_sha256,
+        };
+    }
 }
 
 impl SseDecode for i32 {
@@ -599,6 +653,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::library::Drama {
             self.tags.into_into_dart().into_dart(),
             self.cover.into_into_dart().into_dart(),
             self.episode_count.into_into_dart().into_dart(),
+            self.published_ids.into_into_dart().into_dart(),
             self.episodes.into_into_dart().into_dart(),
         ]
         .into_dart()
@@ -621,6 +676,9 @@ impl flutter_rust_bridge::IntoDart for crate::api::library::Episode {
             self.bytes.into_into_dart().into_dart(),
             self.sha256.into_into_dart().into_dart(),
             self.mirrors.into_into_dart().into_dart(),
+            self.encodings.into_into_dart().into_dart(),
+            self.duration_ms.into_into_dart().into_dart(),
+            self.listed_ms.into_into_dart().into_dart(),
             self.ad_breaks.into_into_dart().into_dart(),
         ]
         .into_dart()
@@ -654,6 +712,30 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::library::Progress>
     for crate::api::library::Progress
 {
     fn into_into_dart(self) -> crate::api::library::Progress {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::library::VideoEncoding {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.width.into_into_dart().into_dart(),
+            self.height.into_into_dart().into_dart(),
+            self.url.into_into_dart().into_dart(),
+            self.bytes.into_into_dart().into_dart(),
+            self.sha256.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::library::VideoEncoding
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::library::VideoEncoding>
+    for crate::api::library::VideoEncoding
+{
+    fn into_into_dart(self) -> crate::api::library::VideoEncoding {
         self
     }
 }
@@ -696,6 +778,7 @@ impl SseEncode for crate::api::library::Drama {
         <Vec<String>>::sse_encode(self.tags, serializer);
         <Option<String>>::sse_encode(self.cover, serializer);
         <Option<u32>>::sse_encode(self.episode_count, serializer);
+        <Option<Vec<String>>>::sse_encode(self.published_ids, serializer);
         <Vec<crate::api::library::Episode>>::sse_encode(self.episodes, serializer);
     }
 }
@@ -710,6 +793,9 @@ impl SseEncode for crate::api::library::Episode {
         <Option<u32>>::sse_encode(self.bytes, serializer);
         <Option<String>>::sse_encode(self.sha256, serializer);
         <Option<Vec<String>>>::sse_encode(self.mirrors, serializer);
+        <Option<Vec<crate::api::library::VideoEncoding>>>::sse_encode(self.encodings, serializer);
+        <Option<u32>>::sse_encode(self.duration_ms, serializer);
+        <Option<u32>>::sse_encode(self.listed_ms, serializer);
         <Option<Vec<crate::api::library::AdBreak>>>::sse_encode(self.ad_breaks, serializer);
     }
 }
@@ -784,6 +870,16 @@ impl SseEncode for Vec<crate::api::library::Progress> {
     }
 }
 
+impl SseEncode for Vec<crate::api::library::VideoEncoding> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::library::VideoEncoding>::sse_encode(item, serializer);
+        }
+    }
+}
+
 impl SseEncode for Option<String> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -824,6 +920,16 @@ impl SseEncode for Option<Vec<crate::api::library::AdBreak>> {
     }
 }
 
+impl SseEncode for Option<Vec<crate::api::library::VideoEncoding>> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <Vec<crate::api::library::VideoEncoding>>::sse_encode(value, serializer);
+        }
+    }
+}
+
 impl SseEncode for crate::api::library::Progress {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -854,6 +960,17 @@ impl SseEncode for u8 {
 impl SseEncode for () {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {}
+}
+
+impl SseEncode for crate::api::library::VideoEncoding {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <u32>::sse_encode(self.width, serializer);
+        <u32>::sse_encode(self.height, serializer);
+        <String>::sse_encode(self.url, serializer);
+        <u32>::sse_encode(self.bytes, serializer);
+        <String>::sse_encode(self.sha256, serializer);
+    }
 }
 
 impl SseEncode for i32 {

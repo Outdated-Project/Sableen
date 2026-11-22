@@ -4,11 +4,22 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from refresh_catalogs import HONGGUO, Publication, published_video
+from refresh_catalogs import HONGGUO, Publication, published_video, quality_files
 from check_streams import complete_series
 
 
 class PublicEpisodeTests(unittest.TestCase):
+    def test_resolution_switch_keeps_distinct_sizes_with_the_same_cut(self):
+        def media(label, duration, width, height):
+            return label, duration, width, height, {'sha256': label, 'bytes': 100}, 'avc1'
+        hd = media('hd', 180000, 1080, 1920)
+        sd = media('sd', 179900, 360, 640)
+        preview = media('preview', 10000, 240, 426)
+        mirror = media('mirror', 179900, 360, 640)
+        choices = quality_files(hd, [preview, sd, hd, mirror], 180000)
+        self.assertEqual([f['url'] for f in choices], ['hd', 'sd'])
+        self.assertEqual(quality_files(hd, [preview, hd], 180000), [])
+
     def test_full_hd_first_episode_does_not_hide_missing_or_duplicate_episodes(self):
         first = {'episode_number': 1, 'full_hd': True}
         second = {'episode_number': 2, 'full_hd': True}

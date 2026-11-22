@@ -336,15 +336,16 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   Drama dco_decode_drama(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 6)
-      throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
+    if (arr.length != 7)
+      throw Exception('unexpected arr length: expect 7 but see ${arr.length}');
     return Drama(
       id: dco_decode_String(arr[0]),
       title: dco_decode_String(arr[1]),
       tags: dco_decode_list_String(arr[2]),
       cover: dco_decode_opt_String(arr[3]),
       episodeCount: dco_decode_opt_box_autoadd_u_32(arr[4]),
-      episodes: dco_decode_list_episode(arr[5]),
+      publishedIds: dco_decode_opt_list_String(arr[5]),
+      episodes: dco_decode_list_episode(arr[6]),
     );
   }
 
@@ -352,8 +353,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   Episode dco_decode_episode(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 8)
-      throw Exception('unexpected arr length: expect 8 but see ${arr.length}');
+    if (arr.length != 11)
+      throw Exception('unexpected arr length: expect 11 but see ${arr.length}');
     return Episode(
       id: dco_decode_String(arr[0]),
       title: dco_decode_String(arr[1]),
@@ -362,7 +363,10 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       bytes: dco_decode_opt_box_autoadd_u_32(arr[4]),
       sha256: dco_decode_opt_String(arr[5]),
       mirrors: dco_decode_opt_list_String(arr[6]),
-      adBreaks: dco_decode_opt_list_ad_break(arr[7]),
+      encodings: dco_decode_opt_list_video_encoding(arr[7]),
+      durationMs: dco_decode_opt_box_autoadd_u_32(arr[8]),
+      listedMs: dco_decode_opt_box_autoadd_u_32(arr[9]),
+      adBreaks: dco_decode_opt_list_ad_break(arr[10]),
     );
   }
 
@@ -415,6 +419,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  List<VideoEncoding> dco_decode_list_video_encoding(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_video_encoding).toList();
+  }
+
+  @protected
   String? dco_decode_opt_String(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw == null ? null : dco_decode_String(raw);
@@ -436,6 +446,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   List<AdBreak>? dco_decode_opt_list_ad_break(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw == null ? null : dco_decode_list_ad_break(raw);
+  }
+
+  @protected
+  List<VideoEncoding>? dco_decode_opt_list_video_encoding(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_list_video_encoding(raw);
   }
 
   @protected
@@ -471,6 +487,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   void dco_decode_unit(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return;
+  }
+
+  @protected
+  VideoEncoding dco_decode_video_encoding(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 5)
+      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+    return VideoEncoding(
+      width: dco_decode_u_32(arr[0]),
+      height: dco_decode_u_32(arr[1]),
+      url: dco_decode_String(arr[2]),
+      bytes: dco_decode_u_32(arr[3]),
+      sha256: dco_decode_String(arr[4]),
+    );
   }
 
   @protected
@@ -516,6 +547,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_tags = sse_decode_list_String(deserializer);
     var var_cover = sse_decode_opt_String(deserializer);
     var var_episodeCount = sse_decode_opt_box_autoadd_u_32(deserializer);
+    var var_publishedIds = sse_decode_opt_list_String(deserializer);
     var var_episodes = sse_decode_list_episode(deserializer);
     return Drama(
       id: var_id,
@@ -523,6 +555,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       tags: var_tags,
       cover: var_cover,
       episodeCount: var_episodeCount,
+      publishedIds: var_publishedIds,
       episodes: var_episodes,
     );
   }
@@ -537,6 +570,9 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_bytes = sse_decode_opt_box_autoadd_u_32(deserializer);
     var var_sha256 = sse_decode_opt_String(deserializer);
     var var_mirrors = sse_decode_opt_list_String(deserializer);
+    var var_encodings = sse_decode_opt_list_video_encoding(deserializer);
+    var var_durationMs = sse_decode_opt_box_autoadd_u_32(deserializer);
+    var var_listedMs = sse_decode_opt_box_autoadd_u_32(deserializer);
     var var_adBreaks = sse_decode_opt_list_ad_break(deserializer);
     return Episode(
       id: var_id,
@@ -546,6 +582,9 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       bytes: var_bytes,
       sha256: var_sha256,
       mirrors: var_mirrors,
+      encodings: var_encodings,
+      durationMs: var_durationMs,
+      listedMs: var_listedMs,
       adBreaks: var_adBreaks,
     );
   }
@@ -637,6 +676,20 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  List<VideoEncoding> sse_decode_list_video_encoding(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <VideoEncoding>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_video_encoding(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
   String? sse_decode_opt_String(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
 
@@ -681,6 +734,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  List<VideoEncoding>? sse_decode_opt_list_video_encoding(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_list_video_encoding(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
   Progress sse_decode_progress(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_drama = sse_decode_String(deserializer);
@@ -716,6 +782,23 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   @protected
   void sse_decode_unit(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
+  }
+
+  @protected
+  VideoEncoding sse_decode_video_encoding(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_width = sse_decode_u_32(deserializer);
+    var var_height = sse_decode_u_32(deserializer);
+    var var_url = sse_decode_String(deserializer);
+    var var_bytes = sse_decode_u_32(deserializer);
+    var var_sha256 = sse_decode_String(deserializer);
+    return VideoEncoding(
+      width: var_width,
+      height: var_height,
+      url: var_url,
+      bytes: var_bytes,
+      sha256: var_sha256,
+    );
   }
 
   @protected
@@ -764,6 +847,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_list_String(self.tags, serializer);
     sse_encode_opt_String(self.cover, serializer);
     sse_encode_opt_box_autoadd_u_32(self.episodeCount, serializer);
+    sse_encode_opt_list_String(self.publishedIds, serializer);
     sse_encode_list_episode(self.episodes, serializer);
   }
 
@@ -777,6 +861,9 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_opt_box_autoadd_u_32(self.bytes, serializer);
     sse_encode_opt_String(self.sha256, serializer);
     sse_encode_opt_list_String(self.mirrors, serializer);
+    sse_encode_opt_list_video_encoding(self.encodings, serializer);
+    sse_encode_opt_box_autoadd_u_32(self.durationMs, serializer);
+    sse_encode_opt_box_autoadd_u_32(self.listedMs, serializer);
     sse_encode_opt_list_ad_break(self.adBreaks, serializer);
   }
 
@@ -860,6 +947,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_list_video_encoding(
+    List<VideoEncoding> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_video_encoding(item, serializer);
+    }
+  }
+
+  @protected
   void sse_encode_opt_String(String? self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
 
@@ -906,6 +1005,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_opt_list_video_encoding(
+    List<VideoEncoding>? self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_list_video_encoding(self, serializer);
+    }
+  }
+
+  @protected
   void sse_encode_progress(Progress self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_String(self.drama, serializer);
@@ -932,6 +1044,16 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   @protected
   void sse_encode_unit(void self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
+  }
+
+  @protected
+  void sse_encode_video_encoding(VideoEncoding self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_u_32(self.width, serializer);
+    sse_encode_u_32(self.height, serializer);
+    sse_encode_String(self.url, serializer);
+    sse_encode_u_32(self.bytes, serializer);
+    sse_encode_String(self.sha256, serializer);
   }
 
   @protected

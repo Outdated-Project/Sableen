@@ -153,7 +153,8 @@ class DramaShelf extends StatelessWidget {
                   ),
               ],
             );
-            return Material(
+            return Card.filled(
+              margin: EdgeInsets.zero,
               color: horizontal
                   ? colors.surfaceContainerLowest
                   : Colors.transparent,

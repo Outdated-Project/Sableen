@@ -170,6 +170,8 @@ fn bundled_catalogs_have_unique_ids_and_valid_media() {
             for episode in drama.episodes {
                 assert!(episode.url.starts_with("https://hongguoduanju.com/"));
                 assert!(episode.sha256.is_some() && episode.bytes.is_some());
+                assert!(episode.duration_ms.is_some_and(|ms| ms > 0));
+                assert!(episode.listed_ms.is_some_and(|ms| ms > 0));
             }
         }
     }

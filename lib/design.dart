@@ -73,6 +73,18 @@ ThemeData theaterTheme(
     iconButtonTheme: const IconButtonThemeData(
       variant: StyleVariant.material3Expressive,
     ),
+    // These pinned material_ui themes still default to the older geometry.
+    // ignore: deprecated_member_use
+    sliderTheme: const SliderThemeData(year2023: false),
+    // ignore: deprecated_member_use
+    progressIndicatorTheme: const ProgressIndicatorThemeData(year2023: false),
+    searchBarTheme: SearchBarThemeData(
+      elevation: const WidgetStatePropertyAll(0),
+      backgroundColor: WidgetStatePropertyAll(scheme.surfaceContainer),
+      padding: const WidgetStatePropertyAll(
+        EdgeInsets.symmetric(horizontal: 16),
+      ),
+    ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: scheme.surfaceContainer,

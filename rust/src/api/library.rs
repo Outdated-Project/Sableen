@@ -15,6 +15,15 @@ pub struct AdBreak {
 }
 
 #[derive(Clone, Debug, NsonDeserialize)]
+pub struct VideoEncoding {
+    pub width: u32,
+    pub height: u32,
+    pub url: String,
+    pub bytes: u32,
+    pub sha256: String,
+}
+
+#[derive(Clone, Debug, NsonDeserialize)]
 pub struct Episode {
     pub id: String,
     pub title: String,
@@ -23,6 +32,11 @@ pub struct Episode {
     pub bytes: Option<u32>,
     pub sha256: Option<String>,
     pub mirrors: Option<Vec<String>>,
+    pub encodings: Option<Vec<VideoEncoding>>,
+    #[serde(rename = "durationMs")]
+    pub duration_ms: Option<u32>,
+    #[serde(rename = "listedMs")]
+    pub listed_ms: Option<u32>,
     pub ad_breaks: Option<Vec<AdBreak>>,
 }
 
@@ -33,6 +47,7 @@ pub struct Drama {
     pub tags: Vec<String>,
     pub cover: Option<String>,
     pub episode_count: Option<u32>,
+    pub published_ids: Option<Vec<String>>,
     pub episodes: Vec<Episode>,
 }
 
@@ -92,6 +107,33 @@ pub fn valid_address(address: &str) -> bool {
             }) && recurse_x::Name::from_ascii(&url.host).is_ok()))
 }
 
+fn valid_digest(hash: &str, size: u32) -> bool {
+    (1..=536_870_912).contains(&size)
+        && hash.len() == 64
+        && hash
+            .bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+}
+
+fn valid_encodings(ep: &Episode, files: &[VideoEncoding]) -> bool {
+    let mut sizes = HashSet::new();
+    let mut hashes = HashSet::new();
+    let mut urls = HashSet::new();
+    (2..=16).contains(&files.len())
+        && files.iter().all(|f| {
+            (1..=16384).contains(&f.width)
+                && (1..=16384).contains(&f.height)
+                && valid_address(&f.url)
+                && valid_digest(&f.sha256, f.bytes)
+                && sizes.insert((f.width, f.height))
+                && hashes.insert(&f.sha256)
+                && urls.insert(&f.url)
+        })
+        && files.iter().any(|f| {
+            f.url == ep.url && Some(&f.sha256) == ep.sha256.as_ref() && Some(f.bytes) == ep.bytes
+        })
+}
+
 pub fn parse_catalog(bytes: Vec<u8>) -> Result<Vec<Drama>, String> {
     if bytes.len() > MAX_CATALOG_BYTES {
         return Err("size".into());
@@ -119,11 +161,23 @@ pub fn parse_catalog(bytes: Vec<u8>) -> Result<Vec<Drama>, String> {
             return Err("drama".into());
         }
         let mut episodes = HashSet::new();
+        let published = drama
+            .published_ids
+            .as_ref()
+            .map(|ids| ids.iter().collect::<HashSet<_>>());
+        if let (Some(ids), Some(unique)) = (&drama.published_ids, &published)
+            && (Some(ids.len() as u32) != drama.episode_count
+                || unique.len() != ids.len()
+                || ids.iter().any(|id| !valid_text(id, 96)))
+        {
+            return Err("episode list".into());
+        }
         let series_page = format!("https://hongguoduanju.com/player/{}", drama.id);
         for ep in &drama.episodes {
             let breaks = ep.ad_breaks.as_deref().unwrap_or_default();
             if !valid_text(&ep.id, 96)
                 || !episodes.insert(&ep.id)
+                || published.as_ref().is_some_and(|ids| !ids.contains(&ep.id))
                 || !valid_text(&ep.title, 384)
                 || !valid_address(&ep.url)
                 || ep.mirrors.as_ref().is_some_and(|urls| {
@@ -132,15 +186,14 @@ pub fn parse_catalog(bytes: Vec<u8>) -> Result<Vec<Drama>, String> {
                         || urls.iter().collect::<HashSet<_>>().len() != urls.len()
                 })
                 || match (&ep.sha256, ep.bytes) {
-                    (Some(hash), Some(1..=536_870_912)) => {
-                        hash.len() != 64
-                            || !hash
-                                .bytes()
-                                .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
-                    }
+                    (Some(hash), Some(size)) => !valid_digest(hash, size),
                     (None, None) => false,
                     _ => true,
                 }
+                || ep
+                    .encodings
+                    .as_ref()
+                    .is_some_and(|files| !valid_encodings(ep, files))
                 || ep.page.as_ref().is_some_and(|page| {
                     !valid_address(page)
                         || (page != &series_page && page != &format!("{series_page}/{}", ep.id))

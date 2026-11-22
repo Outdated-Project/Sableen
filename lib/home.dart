@@ -80,6 +80,7 @@ class _HomeState extends State<Home> {
             library: library,
             drama: drama,
             initial: episode,
+            initialFile: selected,
             poster: poster,
           ),
         ),
@@ -135,12 +136,10 @@ class _HomeState extends State<Home> {
     final wide = MediaQuery.sizeOf(context).width >= 760;
     final insets = wide ? 36.0 : 16.0;
     final colors = Theme.of(context).colorScheme;
-    final searchField = TextField(
+    final searchField = SearchBar(
       controller: search,
-      decoration: InputDecoration(
-        prefixIcon: const Icon(Icons.search_rounded),
-        hintText: context.zh('搜索剧名或题材', '搜尋劇名或題材'),
-      ),
+      leading: const Icon(Icons.search_rounded),
+      hintText: context.zh('搜索剧名或题材', '搜尋劇名或題材'),
       onChanged: (s) => setState(() => query = s.trim()),
     );
     Widget shelf(List<Drama> items) => DramaShelf(

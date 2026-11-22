@@ -9,7 +9,10 @@ import 'package:path_provider/path_provider.dart';
 
 import 'src/rust/api/library.dart';
 import 'download_status.dart';
+import 'episode_media.dart';
 export 'download_status.dart';
+
+String mediaUrl(Episode episode) => episode.url;
 
 class EpisodeDownload {
   EpisodeDownload(this.title, this.episode);
@@ -108,7 +111,7 @@ class DownloadQueue extends ChangeNotifier {
     final root = Directory('${(await directory()).path}/episodes');
     final byHash = {
       for (final drama in catalog)
-        for (final e in drama.episodes)
+        for (final e in drama.episodes.expand((episode) => episode.files))
           if (e.sha256 != null) e.sha256!: (drama.title, e),
     };
     final found = <String>{};

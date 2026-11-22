@@ -93,6 +93,21 @@ class Library extends ChangeNotifier {
         title: e.title,
         page: e.page,
         adBreaks: e.adBreaks,
+        durationMs: e.durationMs,
+        listedMs: e.listedMs,
+        encodings: e.encodings
+            ?.map(
+              (file) => file.sha256 != e.sha256
+                  ? file
+                  : VideoEncoding(
+                      width: file.width,
+                      height: file.height,
+                      bytes: size,
+                      sha256: hash,
+                      url: 'asset:///assets/renditions/$hash.mp4',
+                    ),
+            )
+            .toList(growable: false),
         url: 'asset:///assets/renditions/$hash.mp4',
         sha256: hash,
         bytes: size,
@@ -105,6 +120,7 @@ class Library extends ChangeNotifier {
       tags: drama.tags,
       cover: drama.cover,
       episodeCount: drama.episodeCount,
+      publishedIds: drama.publishedIds,
       episodes: drama.episodes.map(playbackFile).toList(growable: false),
     );
   }

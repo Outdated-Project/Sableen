@@ -8,6 +8,7 @@ import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
 import 'design.dart';
+import 'episode_media.dart';
 import 'library.dart';
 import 'offline.dart';
 import 'player_sheet.dart';
@@ -45,11 +46,13 @@ class Theater extends StatefulWidget {
     required this.library,
     required this.drama,
     required this.initial,
+    this.initialFile,
     this.poster,
   });
   final Library library;
   final Drama drama;
   final int initial;
+  final Episode? initialFile;
   final ImageProvider? poster;
   @override
   State<Theater> createState() => _TheaterState();
@@ -75,7 +78,7 @@ class _TheaterState extends State<Theater> with WidgetsBindingObserver {
   int? skippedBreak;
   int? pendingWebStart;
   String? localSource;
-  Episode get episode => widget.drama.episodes[index];
+  late Episode episode;
   @override
   void initState() {
     super.initState();
@@ -123,7 +126,10 @@ class _TheaterState extends State<Theater> with WidgetsBindingObserver {
           }
         }),
       player.stream.position.listen(_position),
-      player.stream.duration.listen((_) => _update()),
+      player.stream.duration.listen((_) {
+        _resumeWeb();
+        _update();
+      }),
       player.stream.width.listen((_) => _update()),
       player.stream.height.listen((_) => _update()),
       player.stream.buffering.listen((_) {
@@ -169,7 +175,7 @@ class _TheaterState extends State<Theater> with WidgetsBindingObserver {
         }
       }),
     ]);
-    unawaited(_open(index));
+    unawaited(_open(index, file: widget.initialFile));
   }
 
   void _update() {
@@ -208,7 +214,7 @@ class _TheaterState extends State<Theater> with WidgetsBindingObserver {
     if (opening || closed || background) return;
     _reveal();
     if (completed || failed) {
-      unawaited(_open(index));
+      unawaited(_open(index, file: episode));
     } else {
       unawaited(player.playOrPause());
     }
@@ -226,7 +232,12 @@ class _TheaterState extends State<Theater> with WidgetsBindingObserver {
     _reveal();
   }
 
-  Future<void> _open(int next) async {
+  Future<void> _open(
+    int next, {
+    Episode? file,
+    int? resumeMs,
+    bool play = true,
+  }) async {
     if (closed) return;
     if (!opening) _save();
     opening = true;
@@ -234,8 +245,10 @@ class _TheaterState extends State<Theater> with WidgetsBindingObserver {
     completed = false;
     dragging = null;
     index = next;
+    episode = file ?? widget.drama.episodes[index];
     final prior = widget.library.latest(widget.drama.id, episode.id);
-    previous = prior == null || prior.completed ? 0 : prior.positionMs;
+    previous =
+        resumeMs ?? (prior == null || prior.completed ? 0 : prior.positionMs);
     previous = _contentPosition(previous);
     pendingWebStart = kIsWeb && previous > 0 ? previous : null;
     skippedBreak = null;
@@ -254,12 +267,12 @@ class _TheaterState extends State<Theater> with WidgetsBindingObserver {
       try {
         await player.open(
           Media(
-            local ?? episode.url,
+            local ?? playbackUrl(episode),
             start: !kIsWeb && previous > 0
                 ? Duration(milliseconds: previous)
                 : null,
           ),
-          play: !background,
+          play: play && !background,
         );
       } finally {
         releaseOfflinePath(old);
@@ -270,6 +283,7 @@ class _TheaterState extends State<Theater> with WidgetsBindingObserver {
     }
     if (closed) return;
     opening = false;
+    _resumeWeb();
     _scheduleControls(player.state.playing);
     lastWrite = 0;
     lastTick = 0;
@@ -320,6 +334,16 @@ class _TheaterState extends State<Theater> with WidgetsBindingObserver {
     return ms;
   }
 
+  bool _resumeWeb() {
+    final resume = pendingWebStart;
+    if (resume == null || closed || opening || seeking) return false;
+    final duration = player.state.duration.inMilliseconds;
+    if (duration <= 0) return true;
+    pendingWebStart = null;
+    unawaited(_seek(resume < duration ? resume : 0));
+    return true;
+  }
+
   void _position(Duration position) {
     if (closed || opening || seeking || background) return;
     final ms = position.inMilliseconds, now = elapsed.elapsedMilliseconds;
@@ -331,14 +355,7 @@ class _TheaterState extends State<Theater> with WidgetsBindingObserver {
       _resetEvidence();
       _update();
     }
-    final resume = pendingWebStart;
-    if (resume != null) {
-      final duration = player.state.duration.inMilliseconds;
-      if (duration <= 0) return;
-      pendingWebStart = null;
-      unawaited(_seek(resume < duration ? resume : 0));
-      return;
-    }
+    if (_resumeWeb()) return;
     final content = _contentPosition(ms);
     if (content != ms) {
       if (skippedBreak != content) {
@@ -695,7 +712,33 @@ class _TheaterState extends State<Theater> with WidgetsBindingObserver {
                                                 ),
                                               ),
                                               VideoQuality(
+                                                key: ValueKey(episode.id),
                                                 player: player,
+                                                episode: episode,
+                                                selectFile: (file) {
+                                                  if (opening ||
+                                                      seeking ||
+                                                      closed) {
+                                                    return;
+                                                  }
+                                                  final source = widget
+                                                      .drama
+                                                      .episodes[index];
+                                                  unawaited(
+                                                    _open(
+                                                      index,
+                                                      file: source.withEncoding(
+                                                        file,
+                                                      ),
+                                                      resumeMs: player
+                                                          .state
+                                                          .position
+                                                          .inMilliseconds,
+                                                      play:
+                                                          player.state.playing,
+                                                    ),
+                                                  );
+                                                },
                                                 enabled: !opening && !seeking,
                                                 rotated: rotate,
                                               ),
@@ -735,6 +778,10 @@ class _TheaterState extends State<Theater> with WidgetsBindingObserver {
   Future<void> _selectEpisode(bool rotated) async {
     final episodes = widget.drama.episodes;
     final total = widget.drama.episodeCount;
+    final full = episodes.where((e) => e.isFullLength).length;
+    final previews = episodes.where((e) => e.isPreview).length;
+    final published = widget.drama.publishedIds;
+    final filesById = {for (final (i, e) in episodes.indexed) e.id: i};
     final selected = await showPlayerSheet<int>(
       context: context,
       rotated: rotated,
@@ -744,31 +791,36 @@ class _TheaterState extends State<Theater> with WidgetsBindingObserver {
           ListTile(
             title: Text(widget.drama.title),
             subtitle: Text(
-              total == null
-                  ? context.zh(
-                      '可播放 ${episodes.length} 集',
-                      '可播放 ${episodes.length} 集',
-                    )
-                  : context.zh(
-                      '全 $total 集 · 当前可播放 ${episodes.length} 集',
-                      '全 $total 集 · 目前可播放 ${episodes.length} 集',
-                    ),
+              [
+                if (total != null) '全 $total 集',
+                context.zh('正片 $full 集', '正片 $full 集'),
+                if (previews > 0)
+                  context.zh('片段 $previews 个', '片段 $previews 個'),
+              ].join(' · '),
             ),
           ),
           Flexible(
             child: ListView.builder(
               shrinkWrap: true,
-              itemCount: episodes.length,
-              itemBuilder: (context, i) => ListTile(
-                selected: i == index,
-                leading: Icon(
-                  i == index
-                      ? Icons.play_arrow_rounded
-                      : Icons.play_circle_outline,
-                ),
-                title: Text(episodes[i].title),
-                onTap: () => Navigator.pop(context, i),
-              ),
+              itemCount: published?.length ?? episodes.length,
+              itemBuilder: (context, row) {
+                final number = row + 1;
+                final i = published == null ? row : filesById[published[row]];
+                return ListTile(
+                  enabled: i != null,
+                  selected: i == index,
+                  leading: Icon(
+                    i == null
+                        ? Icons.videocam_off_outlined
+                        : i == index
+                        ? Icons.play_arrow_rounded
+                        : Icons.play_circle_outline,
+                  ),
+                  title: Text(i == null ? '第$number集' : episodes[i].title),
+                  trailing: i == null ? Text(context.zh('暂无片源', '暫無片源')) : null,
+                  onTap: i == null ? null : () => Navigator.pop(context, i),
+                );
+              },
             ),
           ),
         ],

@@ -7,9 +7,9 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `valid_text`, `validate_history`
+// These functions are ignored because they are not marked as `pub`: `valid_digest`, `valid_encodings`, `valid_text`, `validate_history`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Catalog`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `decode_compact`, `encode_compact`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `nextdecode_into`, `nextdecode_into`, `nextdecode_into`, `nextdecode_into`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `decode_compact`, `encode_compact`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `nextdecode_into`, `nextdecode_into`, `nextdecode_into`, `nextdecode_into`, `nextdecode_into`
 
 Future<bool> validAddress({required String address}) =>
     RustLib.instance.api.crateApiLibraryValidAddress(address: address);
@@ -75,6 +75,7 @@ class Drama {
   final List<String> tags;
   final String? cover;
   final int? episodeCount;
+  final List<String>? publishedIds;
   final List<Episode> episodes;
 
   const Drama({
@@ -83,6 +84,7 @@ class Drama {
     required this.tags,
     this.cover,
     this.episodeCount,
+    this.publishedIds,
     required this.episodes,
   });
 
@@ -93,6 +95,7 @@ class Drama {
       tags.hashCode ^
       cover.hashCode ^
       episodeCount.hashCode ^
+      publishedIds.hashCode ^
       episodes.hashCode;
 
   @override
@@ -105,6 +108,7 @@ class Drama {
           tags == other.tags &&
           cover == other.cover &&
           episodeCount == other.episodeCount &&
+          publishedIds == other.publishedIds &&
           episodes == other.episodes;
 }
 
@@ -116,6 +120,9 @@ class Episode {
   final int? bytes;
   final String? sha256;
   final List<String>? mirrors;
+  final List<VideoEncoding>? encodings;
+  final int? durationMs;
+  final int? listedMs;
   final List<AdBreak>? adBreaks;
 
   const Episode({
@@ -126,6 +133,9 @@ class Episode {
     this.bytes,
     this.sha256,
     this.mirrors,
+    this.encodings,
+    this.durationMs,
+    this.listedMs,
     this.adBreaks,
   });
 
@@ -138,6 +148,9 @@ class Episode {
       bytes.hashCode ^
       sha256.hashCode ^
       mirrors.hashCode ^
+      encodings.hashCode ^
+      durationMs.hashCode ^
+      listedMs.hashCode ^
       adBreaks.hashCode;
 
   @override
@@ -152,6 +165,9 @@ class Episode {
           bytes == other.bytes &&
           sha256 == other.sha256 &&
           mirrors == other.mirrors &&
+          encodings == other.encodings &&
+          durationMs == other.durationMs &&
+          listedMs == other.listedMs &&
           adBreaks == other.adBreaks;
 }
 
@@ -196,4 +212,39 @@ class Progress {
           watchedMs == other.watchedMs &&
           updated == other.updated &&
           completed == other.completed;
+}
+
+class VideoEncoding {
+  final int width;
+  final int height;
+  final String url;
+  final int bytes;
+  final String sha256;
+
+  const VideoEncoding({
+    required this.width,
+    required this.height,
+    required this.url,
+    required this.bytes,
+    required this.sha256,
+  });
+
+  @override
+  int get hashCode =>
+      width.hashCode ^
+      height.hashCode ^
+      url.hashCode ^
+      bytes.hashCode ^
+      sha256.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is VideoEncoding &&
+          runtimeType == other.runtimeType &&
+          width == other.width &&
+          height == other.height &&
+          url == other.url &&
+          bytes == other.bytes &&
+          sha256 == other.sha256;
 }

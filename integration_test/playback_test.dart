@@ -181,7 +181,38 @@ void main() {
             find.byTooltip('离线下载').hitTestable().evaluate().isNotEmpty,
       );
       final episode = library.byId[id]!.episodes.first;
+      final ids = library.byId[id]!.publishedIds!;
+      await tester.tap(find.byTooltip('选集'));
+      await tester.pumpAndSettle();
+      final list = find
+          .ancestor(
+            of: find.text(episode.title).last,
+            matching: find.byType(Scrollable),
+          )
+          .first;
+      final position = tester.state<ScrollableState>(list).position;
+      position.jumpTo(position.maxScrollExtent);
+      await tester.pumpAndSettle();
+      final last = library.byId[id]!.episodes
+          .where((e) => e.id == ids.last)
+          .firstOrNull;
+      final lastTile = find.widgetWithText(
+        ListTile,
+        last?.title ?? '第${ids.length}集',
+      );
+      expect(tester.widget<ListTile>(lastTile).enabled, last != null);
+      Navigator.of(tester.element(lastTile)).pop();
+      await tester.pumpAndSettle();
       final hadCopy = await offlinePath(episode) != null;
+      final selectedFile = episode.encodings
+          ?.where((file) => file.sha256 == episode.sha256)
+          .firstOrNull;
+      final downloadTitle = [
+        library.byId[id]!.title,
+        episode.title,
+        if (selectedFile != null)
+          '${selectedFile.width}×${selectedFile.height}',
+      ].join(' · ');
       if (!hadCopy) {
         addTearDown(() async {
           final path = await offlinePath(episode);
@@ -198,10 +229,7 @@ void main() {
         }
         return find.text('已保存').evaluate().isNotEmpty &&
             find
-                .widgetWithText(
-                  ListTile,
-                  '${library.byId[id]!.title} · ${episode.title}',
-                )
+                .widgetWithText(ListTile, downloadTitle)
                 .evaluate()
                 .any(
                   (e) =>

@@ -7,7 +7,20 @@ import 'package:flutter/foundation.dart';
 import 'package:web/web.dart' as web;
 
 import 'download_status.dart';
+import 'episode_media.dart';
 import 'src/rust/api/library.dart';
+
+String mediaUrl(Episode episode) {
+  if (episode.sha256 != null &&
+      !episode.url.startsWith('asset:') &&
+      web.document.querySelector('meta[name="sableen-offline-worker"]') !=
+          null) {
+    return Uri.parse(web.document.baseURI)
+        .resolve('media/${episode.sha256}.mp4')
+        .toString();
+  }
+  return episode.url;
+}
 
 class EpisodeDownload {
   EpisodeDownload(this.title, this.episode);
@@ -66,7 +79,7 @@ class DownloadQueue extends ChangeNotifier {
     final cache = await _cache;
     final keys = (await cache.keys().toDart).toDart.map((r) => r.url).toSet();
     for (final drama in catalog) {
-      for (final e in drama.episodes) {
+      for (final e in drama.episodes.expand((episode) => episode.files)) {
         if (e.sha256 == null) continue;
         final key = _key(e);
         final old = jobs[e.sha256];

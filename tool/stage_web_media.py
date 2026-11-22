@@ -44,9 +44,9 @@ def main():
     root = parser.parse_args().web_root
     catalog = root / 'assets/assets/catalogs'
     renditions = json.loads((catalog.parent / 'renditions/index.json').read_bytes())
-    episodes = {e['sha256']: e for name in RANKS
+    episodes = {file['sha256']: file for name in RANKS
                 for d in json.loads((catalog / f'{name}.json').read_bytes())['dramas']
-                for e in d['episodes'] if e['sha256'] not in renditions}
+                for e in d['episodes'] for file in [e, *e.get('encodings', [])] if file['sha256'] not in renditions}
     folder = root / 'media'
     folder.mkdir(exist_ok=True)
 
@@ -60,7 +60,7 @@ def main():
             return
         with media_snapshot(episode['url']) as media, tempfile.TemporaryDirectory(dir=folder) as work:
             if fingerprint(media) != expected:
-                raise ValueError(f'Media changed for episode {episode["id"]}')
+                raise ValueError(f'Media changed for digest {digest}')
             copy = Path(work) / 'media.mp4'
             shutil.copyfile(media, copy)
             copy.replace(target)

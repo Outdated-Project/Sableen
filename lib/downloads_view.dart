@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
 import 'design.dart';
+import 'episode_media.dart';
 import 'download_web_queue.dart' if (dart.library.io) 'download_queue.dart';
 import 'download_status.dart';
 import 'player_sheet.dart';
@@ -23,6 +24,8 @@ Future<String?> offlinePath(Episode episode) async {
 }
 
 void releaseOfflinePath(String? path) => _downloads.releasePath(path);
+
+String playbackUrl(Episode episode) => mediaUrl(episode);
 
 Widget downloadButton(
   List<Drama> catalog, {
@@ -139,14 +142,24 @@ class _DownloadSheetState extends State<_DownloadSheet> {
                               widget.play != null
                           ? () {
                               final drama = widget.catalog.firstWhere(
-                                (d) => d.episodes.any(
-                                  (e) => e.sha256 == job.episode.sha256,
-                                ),
+                                (d) => d.episodes
+                                    .expand((episode) => episode.files)
+                                    .any((e) => e.sha256 == job.episode.sha256),
                               );
                               widget.play!(drama, job.episode);
                             }
                           : null,
-                      title: Text('${job.title} · ${job.episode.title}'),
+                      title: Text(
+                        [
+                          job.title,
+                          job.episode.title,
+                          if (job.episode.encodings
+                                  ?.where((f) => f.sha256 == job.episode.sha256)
+                                  .firstOrNull
+                              case final file?)
+                            '${file.width}×${file.height}',
+                        ].join(' · '),
+                      ),
                       subtitle: Text(label),
                       trailing: job.state == DownloadState.failed
                           ? IconButton(

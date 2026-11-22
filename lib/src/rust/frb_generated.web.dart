@@ -69,6 +69,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<Progress> dco_decode_list_progress(dynamic raw);
 
   @protected
+  List<VideoEncoding> dco_decode_list_video_encoding(dynamic raw);
+
+  @protected
   String? dco_decode_opt_String(dynamic raw);
 
   @protected
@@ -81,6 +84,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<AdBreak>? dco_decode_opt_list_ad_break(dynamic raw);
 
   @protected
+  List<VideoEncoding>? dco_decode_opt_list_video_encoding(dynamic raw);
+
+  @protected
   Progress dco_decode_progress(dynamic raw);
 
   @protected
@@ -91,6 +97,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void dco_decode_unit(dynamic raw);
+
+  @protected
+  VideoEncoding dco_decode_video_encoding(dynamic raw);
 
   @protected
   String sse_decode_String(SseDeserializer deserializer);
@@ -138,6 +147,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<Progress> sse_decode_list_progress(SseDeserializer deserializer);
 
   @protected
+  List<VideoEncoding> sse_decode_list_video_encoding(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   String? sse_decode_opt_String(SseDeserializer deserializer);
 
   @protected
@@ -150,6 +164,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<AdBreak>? sse_decode_opt_list_ad_break(SseDeserializer deserializer);
 
   @protected
+  List<VideoEncoding>? sse_decode_opt_list_video_encoding(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   Progress sse_decode_progress(SseDeserializer deserializer);
 
   @protected
@@ -160,6 +179,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_decode_unit(SseDeserializer deserializer);
+
+  @protected
+  VideoEncoding sse_decode_video_encoding(SseDeserializer deserializer);
 
   @protected
   int sse_decode_i_32(SseDeserializer deserializer);
@@ -216,6 +238,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_list_progress(List<Progress> self, SseSerializer serializer);
 
   @protected
+  void sse_encode_list_video_encoding(
+    List<VideoEncoding> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_opt_String(String? self, SseSerializer serializer);
 
   @protected
@@ -231,6 +259,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_opt_list_video_encoding(
+    List<VideoEncoding>? self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_progress(Progress self, SseSerializer serializer);
 
   @protected
@@ -241,6 +275,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_unit(void self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_video_encoding(VideoEncoding self, SseSerializer serializer);
 
   @protected
   void sse_encode_i_32(int self, SseSerializer serializer);
