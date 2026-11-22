@@ -29,9 +29,11 @@ async function test() {
     page.on('response', res => { if (res.status() >= 400) console.error('HTTP', res.status(), new URL(res.url()).hostname); });
     await page.goto(`http://127.0.0.1:${server.address().port}`);
     await page.locator('flt-semantics-placeholder').dispatchEvent('click');
-    const titles = [['红果短剧', 'hongguo'], ['红果漫剧', 'comic']].map(([label, file]) =>
-      [label, JSON.parse(fs.readFileSync(path.join(root, 'assets/assets/catalogs', file + '.json'), 'utf8')).dramas[0].title]);
-    for (const [publisher, title] of titles) {
+    const titles = [['红果短剧', 'hongguo'], ['红果漫剧', 'comic']].map(([label, file]) => {
+      const drama = JSON.parse(fs.readFileSync(path.join(root, 'assets/assets/catalogs', file + '.json'), 'utf8')).dramas[0];
+      return [label, drama.title, drama.episodes[0].page];
+    });
+    for (const [publisher, title, officialPage] of titles) {
       console.log('Testing', publisher, title);
       await page.getByRole('checkbox', { name: publisher }).press('Space');
       await page.getByRole('button', { name: new RegExp(title) }).first().press('Enter');
@@ -56,6 +58,16 @@ async function test() {
         await page.waitForFunction(() => { const v = document.querySelector('video'); return v?.currentTime >= v?.duration * .45; }, null, { timeout: 4500 });
       }
       await page.mouse.move(70, 70);
+      const [official] = await Promise.all([
+        page.context().waitForEvent('page'),
+        page.getByRole('button', { name: '红果官网观看' }).press('Enter'),
+      ]);
+      try {
+        await official.waitForURL(officialPage, { waitUntil: 'commit' });
+        await page.waitForFunction(() => document.querySelector('video')?.paused);
+      } finally {
+        await official.close();
+      }
       await page.getByRole('button', { name: '返回', exact: true }).first().evaluate(el => el.click());
       await page.getByRole('tab', { name: '历史' }).waitFor();
     }

@@ -197,6 +197,32 @@ class _TheaterState extends State<Theater> with WidgetsBindingObserver {
     }
   }
 
+  Future<void> _openPublisher() async {
+    final uri = Uri.parse(episode.page!);
+    final mobile =
+        !kIsWeb &&
+        (defaultTargetPlatform == TargetPlatform.android ||
+            defaultTargetPlatform == TargetPlatform.iOS);
+    var opened = false;
+    try {
+      opened = await launchUrl(
+        uri,
+        mode: mobile
+            ? LaunchMode.inAppBrowserView
+            : LaunchMode.externalApplication,
+      );
+    } on PlatformException {
+      // Show the episode link if the system cannot open it.
+    }
+    if (!mounted) return;
+    if (opened) {
+      await player.pause();
+    } else {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: SelectableText(uri.toString())));
+    }
+  }
+
   Future<void> _open(int next) async {
     if (closed) return;
     if (!opening) _save();
@@ -596,30 +622,6 @@ class _TheaterState extends State<Theater> with WidgetsBindingObserver {
                                   Icons.picture_in_picture_alt_rounded,
                                 ),
                               ),
-                            if (episode.page != null)
-                              IconButton.filledTonal(
-                                tooltip: context.zh('打开红果官方播放页', '開啟紅果官方播放頁'),
-                                onPressed: () async {
-                                  final uri = Uri.parse(episode.page!);
-                                  var ok = false;
-                                  try {
-                                    ok = await launchUrl(
-                                      uri,
-                                      mode: LaunchMode.externalApplication,
-                                    );
-                                  } on PlatformException {
-                                    // Keep the verified URL available if the OS declines to open it.
-                                  }
-                                  if (context.mounted && !ok) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: SelectableText(uri.toString()),
-                                      ),
-                                    );
-                                  }
-                                },
-                                icon: const Icon(Icons.open_in_new_rounded),
-                              ),
                           ],
                         ),
                         const Spacer(),
@@ -643,6 +645,13 @@ class _TheaterState extends State<Theater> with WidgetsBindingObserver {
                                               .titleSmall,
                                         ),
                                       ),
+                                      if (episode.page != null)
+                                        TextButton(
+                                          onPressed: _openPublisher,
+                                          child: Text(
+                                            context.zh('红果官网观看', '紅果官網觀看'),
+                                          ),
+                                        ),
                                       if (widget.drama.episodes.length > 1)
                                         IconButton(
                                           tooltip: context.zh('选集', '選集'),

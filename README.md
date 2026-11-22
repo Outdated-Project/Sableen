@@ -11,7 +11,9 @@ Sableen 在同一个剧场里提供红果短剧和红果漫剧。界面支持简
 | [真人剧热播榜](https://hongguoduanju.com/rank/hot-real-drama) | 20 部，每部 1 条公开片段 | [《少夫人来自东北3》播放页](https://hongguoduanju.com/player/7706512650816982040) · [实测 10.08 秒 MP4](https://hongguoduanju.com/video/public/7706514645208534041/360p.mp4) |
 | [漫剧热播榜](https://hongguoduanju.com/rank/hot-comic-drama) | 20 部，每部 1 条公开片段 | [《公路求生榜一说她要走到公路尽头第三季》播放页](https://hongguoduanju.com/player/7708355462780947518) · [实测 10.07 秒 MP4](https://hongguoduanju.com/video/public/7708355470964050969/360p.mp4) |
 
-刷新工具从官方榜单进入剧目及分集页，校对作品 ID、分集和 `VideoObject.contentUrl`，再用 `ffprobe` 检查视频轨与容器时长。这两部作品首集的官方标注分别为 178 秒和 115 秒。应用按实际媒体标记片段，播放器右上角可打开红果官方播放页；部分页面会要求登录。当前尚未验证可匿名播放的红果正片。榜单、封面随包提供，播放时才请求媒体。
+2026 年 11 月 22 日，在没有账号和既有 Cookie 的桌面 Chrome 中，关闭红果官网的登录弹窗后，上表两部作品的首集都能播放。播放器报告的集长分别为 178.97 秒和 115.87 秒。通过官网进度条跳到片尾附近后，两集画面都继续前进。Sableen 播放控件里的「红果官网观看」打开对应分集。官网内的进度由红果播放器管理。
+
+Sableen 自带播放器和离线下载使用发布页标明的 `VideoObject.contentUrl`。刷新工具校对作品和分集 ID，用 `ffprobe` 测量公开 MP4 的实际时长。这 40 个文件均为约 10 秒的片段。榜单、封面随包提供。
 
 ## 播放和设备行为
 

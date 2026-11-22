@@ -11,7 +11,9 @@ Sableen plays live-action short dramas and animated dramas from Hongguo. It supp
 | [Live-action](https://hongguoduanju.com/rank/hot-real-drama) | 20 titles, one verified preview each | [Official page](https://hongguoduanju.com/player/7706512650816982040) · [10.08-second MP4](https://hongguoduanju.com/video/public/7706514645208534041/360p.mp4) |
 | [Animated](https://hongguoduanju.com/rank/hot-comic-drama) | 20 titles, one verified preview each | [Official page](https://hongguoduanju.com/player/7708355462780947518) · [10.07-second MP4](https://hongguoduanju.com/video/public/7708355470964050969/360p.mp4) |
 
-The refresh tool follows chart entries to individual episodes, matches the publisher’s `VideoObject.contentUrl`, then probes the video track and duration. The respective episode listings give 178 and 115 seconds. The cards show the length of the available previews. The player links to the official page, which may request a login. Anonymous full episodes have yet to be verified. The app bundles WebP posters and the catalog, then streams the selected media over HTTPS.
+On November 22, 2026, both example episodes played on Hongguo’s website in fresh desktop Chrome sessions after dismissing the sign-in prompt. The official player reported durations of 178.97 and 115.87 seconds. Both videos continued to render frames after seeking near the end using the publisher’s controls. Select **红果官网观看** in Sableen’s playback controls to open the corresponding episode. Hongguo’s player manages progress on its own page.
+
+Sableen’s player and offline downloads use the publisher’s `VideoObject.contentUrl`. The catalog refresh matches the series and episode IDs and probes the published MP4 with `ffprobe`. All 40 bundled entries point to previews of about 10 seconds each. The app bundles the catalog and its WebP posters.
 
 ## Playback
 
