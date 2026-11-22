@@ -106,7 +106,12 @@ class _DownloadSheetState extends State<_DownloadSheet> {
                         _downloads.add(drama.title, e);
                       }
                     },
-                    child: Text(context.zh('下载全部', '下載全部')),
+                    child: Text(
+                      context.zh(
+                        '下载已收录的 ${drama.episodes.length} 集正片',
+                        '下載已收錄的 ${drama.episodes.length} 集正片',
+                      ),
+                    ),
                   ),
               ],
             ),

@@ -3,14 +3,13 @@ import 'dart:math' as math;
 import 'package:material_ui/material_ui.dart';
 
 import 'design.dart';
-import 'episode_media.dart';
 import 'src/rust/api/library.dart';
 
 class EpisodePicker extends StatefulWidget {
-  const EpisodePicker({super.key, required this.drama, required this.current});
+  const EpisodePicker({super.key, required this.drama, this.current});
 
   final Drama drama;
-  final int current;
+  final int? current;
 
   @override
   State<EpisodePicker> createState() => _EpisodePickerState();
@@ -22,8 +21,10 @@ class _EpisodePickerState extends State<EpisodePicker> {
   late final published =
       widget.drama.publishedIds ?? episodes.map((e) => e.id).toList();
   late final files = {for (final (i, e) in episodes.indexed) e.id: i};
-  late int group =
-      math.max(0, published.indexOf(episodes[widget.current].id)) ~/ pageSize;
+  late int group = widget.current == null
+      ? 0
+      : math.max(0, published.indexOf(episodes[widget.current!].id)) ~/
+            pageSize;
   bool choosingGroup = false;
 
   String range(int i) =>
@@ -31,8 +32,6 @@ class _EpisodePickerState extends State<EpisodePicker> {
 
   @override
   Widget build(BuildContext context) {
-    final full = episodes.where((e) => e.isFullLength).length;
-    final previews = episodes.where((e) => e.isPreview).length;
     final start = group * pageSize;
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -46,8 +45,7 @@ class _EpisodePickerState extends State<EpisodePicker> {
           subtitle: Text(
             [
               if (widget.drama.episodeCount case final count?) '全 $count 集',
-              '正片 $full 集',
-              if (previews > 0) context.zh('片段 $previews 个', '片段 $previews 個'),
+              '正片 ${episodes.length} 集',
             ].join(' · '),
           ),
           trailing: published.length <= pageSize
@@ -93,7 +91,7 @@ class _EpisodePickerState extends State<EpisodePicker> {
                     final index = files[published[start + row]];
                     return ListTile(
                       enabled: index != null,
-                      selected: index == widget.current,
+                      selected: index != null && index == widget.current,
                       leading: Icon(
                         index == null
                             ? Icons.list_alt_outlined
@@ -107,7 +105,7 @@ class _EpisodePickerState extends State<EpisodePicker> {
                             : episodes[index].title,
                       ),
                       trailing: index == null
-                          ? Text(context.zh('本应用尚未收录', '本應用尚未收錄'))
+                          ? Text(context.zh('暂无正片', '暫無正片'))
                           : null,
                       onTap: index == null
                           ? null

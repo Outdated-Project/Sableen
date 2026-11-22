@@ -7,6 +7,7 @@ import 'package:material_ui/material_ui.dart';
 import 'design.dart';
 import 'drama_shelf.dart';
 import 'episode_media.dart';
+import 'episode_picker.dart';
 import 'library.dart';
 import 'offline.dart';
 import 'playback.dart';
@@ -51,12 +52,22 @@ class _HomeState extends State<Home> {
     Episode? selected,
   ]) async {
     if (enteringTheater) return;
+    if (drama.episodes.isEmpty) {
+      await showModalBottomSheet<void>(
+        context: context,
+        useSafeArea: true,
+        showDragHandle: true,
+        builder: (_) => EpisodePicker(drama: drama),
+      );
+      return;
+    }
+    final episode = drama.startingIndex(
+      selectedId: selected?.id,
+      last: library.latest(drama.id),
+    );
+    if (episode == null) return;
     enteringTheater = true;
     try {
-      final episode = drama.startingIndex(
-        selectedId: selected?.id,
-        last: library.latest(drama.id),
-      );
       final fullscreen = setTheaterFullscreen(true);
       if (!kIsWeb) {
         await fullscreen;

@@ -200,6 +200,13 @@ def listed_ms(video):
     return round(1000 * sum(float(v or 0) * unit for v, unit in zip(declared.groups(), (3600, 60, 1)))) if declared else 0
 
 
+def has_full_file(episode):
+    measured, listed = episode.get('durationMs'), episode.get('listedMs')
+    return (type(measured) is int and measured > 0 and type(listed) is int and listed > 0
+            and abs(measured - listed) <= 1000 and (episode.get('bytes') or 0) > 0
+            and re.fullmatch('[0-9a-f]{64}', episode.get('sha256') or '') is not None)
+
+
 def published_series(detail):
     match = re.fullmatch(re.escape(HONGGUO) + r'/detail\?series_id=(\d+)', detail)
     if not match:
@@ -340,6 +347,7 @@ def hongguo_title(item, feed=None):
                         if (evidence['sha256'] != delivery.hashes[url] or abs(actual - delivery.duration_ms) > 1000
                                 or abs(actual - total) > 1000 or codec not in {'avc1', *COMPATIBILITY_CODECS}):
                             raise ValueError(f'Publisher file does not match the full episode {item_id}')
+                    if total > 0 and abs(actual - total) <= 1000:
                         decode_end(path, actual)
                     verified.append((url, actual, width, height, evidence, codec))
             except (subprocess.SubprocessError, ValueError, KeyError) as error:

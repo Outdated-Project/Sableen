@@ -20,6 +20,7 @@ class Library extends ChangeNotifier {
   List<Progress> history = const [];
   Map<String, Drama> byId = const {};
   Map<String, Publisher> publishers = const {};
+  Map<String, String> posters = const {};
   bool historyDamaged = false;
   bool writeFailed = false;
   Future<void> _writes = Future.value();
@@ -28,6 +29,7 @@ class Library extends ChangeNotifier {
   Future<void> restore() async {
     final titles = <String, Drama>{};
     final origins = <String, Publisher>{};
+    final covers = <String, String>{};
     final catalogs = <List<Drama>>[];
     final renditions = jsonDecode(
       await rootBundle.loadString('assets/renditions/index.json'),
@@ -37,18 +39,20 @@ class Library extends ChangeNotifier {
         'assets/catalogs/${category.name}.json',
       );
       final source = await parseCatalog(bytes: Uint8List.sublistView(data));
-      final items = [
-        for (final drama in source) _withRenditions(drama, renditions),
-      ];
-      if (items.isEmpty) throw const FormatException('Empty Hongguo category');
-      catalogs.add(items);
-      for (final drama in items) {
+      if (source.isEmpty) throw const FormatException('Empty Hongguo category');
+      final items = <Drama>[];
+      for (final record in source) {
+        final drama = record.forPlayback(renditions);
         if (titles.containsKey(drama.id)) {
           throw const FormatException('Duplicate title ID');
         }
+        items.add(drama);
+        covers[drama.id] =
+            'assets/posters/${category.name}-${record.episodes.first.id}.webp';
         titles[drama.id] = drama;
         origins[drama.id] = category;
       }
+      catalogs.add(items);
     }
     byId = titles;
     // Alternate chart entries without disturbing either publisher's ranking.
@@ -58,6 +62,7 @@ class Library extends ChangeNotifier {
           if (rank < items.length) items[rank],
     ];
     publishers = origins;
+    posters = covers;
     await _writes;
     try {
       final encoded = await disk.getString(_historyKey);
@@ -75,21 +80,6 @@ class Library extends ChangeNotifier {
     } catch (_) {
       historyDamaged = true;
     }
-  }
-
-  Drama _withRenditions(Drama drama, Map<String, dynamic> renditions) {
-    if (renditions.isEmpty) return drama;
-    return Drama(
-      id: drama.id,
-      title: drama.title,
-      tags: drama.tags,
-      cover: drama.cover,
-      episodeCount: drama.episodeCount,
-      publishedIds: drama.publishedIds,
-      episodes: drama.episodes
-          .map((e) => e.withPlaybackRenditions(renditions))
-          .toList(growable: false),
-    );
   }
 
   Progress? latest(String id, [String? episode]) => history

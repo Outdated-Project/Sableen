@@ -64,11 +64,15 @@ class DramaShelf extends StatelessWidget {
             final origin = library.publishers[drama.id]!;
             final last = library.latest(drama.id);
             final progress = history ? last : null;
-            final ep =
-                drama.episodes[drama.startingIndex(
-                  last: last,
-                  selectedId: progress?.episode,
-                )];
+            final start = drama.startingIndex(
+              last: last,
+              selectedId: progress?.episode,
+            );
+            final ep = start == null ? null : drama.episodes[start];
+            final total = drama.episodeCount;
+            final coverage = total == null
+                ? '正片 ${drama.episodes.length} 集'
+                : '正片 ${drama.episodes.length} / $total 集';
             final category = origin == Publisher.comic
                 ? context.zh('红果漫剧', '紅果漫劇')
                 : context.zh('红果短剧', '紅果短劇');
@@ -81,9 +85,7 @@ class DramaShelf extends StatelessWidget {
                     .ceil() *
                 32;
             final image = ResizeImage(
-              AssetImage(
-                'assets/posters/${origin.name}-${drama.episodes.first.id}.webp',
-              ),
+              AssetImage(library.posters[drama.id]!),
               width: pixels.clamp(32, 560),
               policy: ResizeImagePolicy.fit,
             );
@@ -132,13 +134,15 @@ class DramaShelf extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  ep.title,
+                  ep == null ? coverage : '${ep.title} · $coverage',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.bodySmall
                       ?.copyWith(color: colors.onSurfaceVariant),
                 ),
-                if (progress != null && !ep.replacesShorterCut(progress))
+                if (progress != null &&
+                    ep != null &&
+                    !ep.replacesShorterCut(progress))
                   Padding(
                     padding: const EdgeInsets.only(top: 6),
                     child: Semantics(

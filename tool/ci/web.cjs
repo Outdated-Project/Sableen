@@ -32,31 +32,39 @@ const server = http.createServer((req, res) => {
   fs.createReadStream(file).pipe(res);
 });
 
-async function checkEpisodeTransition(browser, url) {
-  const catalog = JSON.parse(fs.readFileSync(path.join(root, 'assets/assets/catalogs/hongguo.json')));
-  const [first, second] = catalog.dramas;
-  const episodes = [first.episodes[0], second.episodes[0]].map((e, i) => ({
-    ...e, title: `第${i + 1}集`, listedMs: e.durationMs,
-    page: `https://hongguoduanju.com/player/${first.id}/${e.id}`,
-  }));
-  const fixture = {...first, title: 'Sableen transition test', published_ids: episodes.map(e => e.id), episode_count: 2, episodes};
+function fullEpisodes(drama) {
+  const files = new Map(drama.episodes.filter(e => e.sha256 && e.bytes > 0 &&
+    e.listedMs > 0 && e.durationMs > 0 && Math.abs(e.listedMs - e.durationMs) <= 1000).map(e => [e.id, e]));
+  return drama.published_ids.map(id => files.get(id));
+}
+
+async function checkEpisodeTransition(browser, url, drama, renditions) {
+  const episodes = fullEpisodes(drama);
+  const index = episodes.findIndex(Boolean);
+  assert(index >= 0 && episodes[index + 1], `Two consecutive full episodes are needed to verify autoplay for ${drama.title}`);
   const context = await browser.newContext({serviceWorkers: 'block'});
   try {
-    await context.route('**/assets/assets/catalogs/hongguo.json', route => route.fulfill({json: {version: 1, dramas: [fixture]}}));
     const page = await context.newPage();
     await page.goto(url);
     await page.locator('flt-semantics-placeholder').dispatchEvent('click');
-    await page.getByRole('button', {name: /Sableen transition test/}).first().press('Enter');
+    await page.getByRole('button', {name: drama.title, exact: false}).first().press('Enter');
     await page.waitForFunction(() => document.querySelector('video')?.currentTime > .25);
     const element = await page.locator('video').elementHandle();
     const original = await element.evaluate(v => v.currentSrc);
+    const filename = e => `${renditions[e.sha256]?.sha256 ?? e.sha256}.mp4`;
+    assert(new URL(original).pathname.endsWith('/' + filename(episodes[index])));
     // Trigger the real ended event and observe the next source playing in the same view.
     await element.evaluate(v => { v.currentTime = v.duration - .5; });
-    await page.waitForFunction(({element, original}) => element.isConnected && element.currentSrc !== original &&
-      !element.paused && element.videoWidth > 0 && element.currentTime > .25, {element, original});
+    await page.waitForFunction(({element, expected}) => element.isConnected && element.currentSrc.endsWith('/' + expected) &&
+      !element.paused && element.videoWidth > 0 && element.currentTime > .25, {element, expected: filename(episodes[index + 1])});
     await page.mouse.move(80, 75);
     await page.getByRole('button', {name: '选集'}).press('Enter');
-    await page.getByText('第1集', {exact: true}).last().click();
+    if (index % 15 === 14) {
+      const start = index + 2;
+      await page.getByRole('button', {name: `${start}–${Math.min(start + 14, episodes.length)}`, exact: true}).press('Enter');
+      await page.getByRole('button', {name: `${start - 15}–${start - 1}`, exact: true}).press('Enter');
+    }
+    await page.getByText(episodes[index].title, {exact: true}).last().click();
     await page.waitForFunction(({element, original}) => element.isConnected && element.currentSrc === original &&
       !element.paused && element.currentTime > .25, {element, original});
   } finally {
@@ -68,7 +76,6 @@ async function test() {
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const browser = await chromium.launch({ channel: 'chrome' });
   try {
-    await checkEpisodeTransition(browser, `http://127.0.0.1:${server.address().port}`);
     const context = await browser.newContext({ viewport: { width: 1000, height: 780 } });
     const page = await context.newPage();
     const errors = [];
@@ -78,11 +85,14 @@ async function test() {
     await page.goto(`http://127.0.0.1:${server.address().port}`);
     await page.locator('flt-semantics-placeholder').dispatchEvent('click');
     const renditions = JSON.parse(fs.readFileSync(path.join(root, 'assets/assets/renditions/index.json'), 'utf8'));
-    const titles = [['红果短剧', 'hongguo'], ['红果漫剧', 'comic']].map(([label, file]) => {
-      const drama = JSON.parse(fs.readFileSync(path.join(root, 'assets/assets/catalogs', file + '.json'), 'utf8')).dramas[0];
-      const episode = drama.episodes.find(e => e.listedMs > 0 && e.durationMs > 0 && Math.abs(e.listedMs - e.durationMs) <= 1000) ?? drama.episodes[0];
+    const charts = [['红果短剧', 'hongguo'], ['红果漫剧', 'comic']].map(([label, file]) =>
+      [label, JSON.parse(fs.readFileSync(path.join(root, 'assets/assets/catalogs', file + '.json'), 'utf8')).dramas[0]]);
+    const titles = charts.map(([label, drama]) => {
+      const episode = fullEpisodes(drama).find(Boolean);
+      assert(episode, `No full episode for playback verification of ${drama.title}`);
       return [label, drama.title, episode, drama.episode_count, drama.published_ids.indexOf(episode.id)];
     });
+    await checkEpisodeTransition(browser, page.url(), charts[0][1], renditions);
     for (const [, title] of titles) await page.getByRole('button', { name: new RegExp(title) }).first().waitFor();
     const firstRow = await Promise.all(titles.map(([, title]) => page.getByRole('button', { name: new RegExp(title) }).first().boundingBox()));
     assert(firstRow.every(box => box && box.y >= 0 && box.y + box.height < 780));

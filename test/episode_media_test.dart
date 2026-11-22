@@ -33,11 +33,56 @@ void main() {
         completed: true,
       );
       expect(show.startingIndex(), 1);
-      expect(show.startingIndex(selectedId: '1'), 0);
+      expect(show.startingIndex(selectedId: '1'), isNull);
       expect(show.startingIndex(last: history(10000)), 1);
       expect(show.episodes[1].replacesShorterCut(history(10000)), isTrue);
       expect(show.startingIndex(last: history(171000)), 2);
       expect(show.startingIndex(selectedId: '2', last: history(171000)), 1);
+    },
+  );
+  test(
+    'The guest catalog retains published gaps and excludes unverified media',
+    () {
+      Episode file(
+        String id,
+        int? measured,
+        int? listed, {
+        bool fingerprinted = true,
+      }) => Episode(
+        id: id,
+        title: id,
+        url: 'https://example.org/$id.mp4',
+        durationMs: measured,
+        listedMs: listed,
+        bytes: fingerprinted ? 1000 : null,
+        sha256: fingerprinted ? 'a' * 64 : null,
+      );
+      final show = Drama(
+        id: 'show',
+        title: 'Series',
+        tags: [],
+        episodeCount: 5,
+        publishedIds: ['1', '2', '3', '4', '5'],
+        episodes: [
+          file('4', 90000, 90000),
+          file('1', 10000, 178000),
+          file('3', 123000, null),
+          file('2', 120000, 120000),
+          file('5', 90000, 90000, fingerprinted: false),
+        ],
+      ).forPlayback({});
+      expect(show.episodes.map((e) => e.id), ['2', '4']);
+      expect(show.publishedIds, ['1', '2', '3', '4', '5']);
+      expect(show.nextEpisodeIndex(0), isNull);
+      expect(show.startingIndex(selectedId: '1'), isNull);
+      final legacy = Drama(
+        id: 'old',
+        title: 'Old',
+        tags: [],
+        episodes: [file('1', 10000, 178000)],
+      ).forPlayback({});
+      expect(legacy.publishedIds, ['1']);
+      expect(legacy.startingIndex(), isNull);
     },
   );
   testWidgets('A sparse catalog opens the current published episode range', (
@@ -56,9 +101,13 @@ void main() {
             id: ids[number - 1],
             title: '第$number集',
             url: 'https://example.org/$number.mp4',
+            durationMs: 120000,
+            listedMs: 120000,
+            bytes: 1000,
+            sha256: number.toRadixString(16).padLeft(64, '0'),
           ),
       ],
-    );
+    ).forPlayback({});
     expect(drama.nextEpisodeIndex(0), isNull);
     expect(drama.nextEpisodeIndex(1), isNull);
     await tester.pumpWidget(

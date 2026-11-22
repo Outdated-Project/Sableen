@@ -71,6 +71,51 @@ void main() {
     await initializePlayback();
   });
   tearDownAll(binding.platformDispatcher.clearSemanticsEnabledTestValue);
+  testWidgets(
+    'A title without full episodes shows the published list without opening a video',
+    (tester) async {
+      final disk = _TestPreferences();
+      final library = Library(disk);
+      await library.restore();
+      final unavailable = library.dramas
+          .where((d) => d.episodes.isEmpty)
+          .firstOrNull;
+      if (unavailable == null) {
+        markTestSkipped('Every bundled series has a full episode');
+        return;
+      }
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: hans,
+          supportedLocales: const [hans, hant],
+          localizationsDelegates: GlobalMaterialLocalizations.delegates,
+          home: Home(library: library, preferences: Preferences(disk)),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final title = find.text(unavailable.title);
+      await tester.scrollUntilVisible(
+        title,
+        280,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(title);
+      await tester.pumpAndSettle();
+      expect(
+        find.text('全 ${unavailable.episodeCount} 集 · 正片 0 集'),
+        findsOneWidget,
+      );
+      final tile = tester.widget<ListTile>(
+        find.widgetWithText(ListTile, '第1集'),
+      );
+      expect(tile.enabled, isFalse);
+      expect(tile.selected, isFalse);
+      expect(find.text('暂无正片'), findsWidgets);
+      expect(find.byType(Theater), findsNothing);
+      expect(find.byType(Video), findsNothing);
+      expect(library.history, isEmpty);
+    },
+  );
   testWidgets('Hongguo video, center tap, visibility, seek and resume', (
     tester,
   ) async {
@@ -136,9 +181,16 @@ void main() {
     }
 
     for (final category in Publisher.values) {
-      final id = library.publishers.entries
-          .firstWhere((e) => e.value == category)
-          .key;
+      final candidates = library.dramas.where(
+        (d) => library.publishers[d.id] == category && d.episodes.isNotEmpty,
+      );
+      expect(
+        candidates,
+        isNotEmpty,
+        reason:
+            '${category.name} has no full episode for playback verification',
+      );
+      final id = candidates.first.id;
       await open(library, id);
       await until(
         'Missing decoded video',
@@ -182,7 +234,7 @@ void main() {
             find.byTooltip('离线下载').hitTestable().evaluate().isNotEmpty,
       );
       final drama = library.byId[id]!;
-      final episode = drama.episodes[drama.startingIndex()];
+      final episode = drama.episodes[drama.startingIndex()!];
       final ids = drama.publishedIds!;
       await tester.tap(find.byTooltip('播放倍速'));
       await tester.pumpAndSettle();
@@ -238,7 +290,7 @@ void main() {
       expect(tester.widget<ListTile>(lastTile).enabled, last != null);
       if (last == null) {
         expect(
-          find.descendant(of: lastTile, matching: find.text('本应用尚未收录')),
+          find.descendant(of: lastTile, matching: find.text('暂无正片')),
           findsOneWidget,
         );
       }
@@ -280,7 +332,6 @@ void main() {
       Navigator.of(tester.element(find.text('下载 ${episode.title}'))).pop();
       await tester.pumpAndSettle();
       final slider = tester.widget<Slider>(find.byType(Slider));
-      // Leave time to measure playback after restoring even a short preview.
       final target = (slider.max * .65).round();
       slider.onChangeEnd!(target.toDouble());
       await until(

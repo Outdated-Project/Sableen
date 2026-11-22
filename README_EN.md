@@ -3,20 +3,20 @@
 <p align="center">A Chinese-language theater for Hongguo short dramas and animated series, with episode-level history and offline playback.</p>
 <p align="center"><a href="README.md">简体中文</a> · <a href="#catalog">Catalog measurements</a> · <a href="#build-and-verify">Build and verify</a> · <a href="https://github.com/blueokanna/Sableen/actions/workflows/stable.yml">Builds</a></p>
 
-The **1.0.1 release candidate** includes 40 titles, each with a playable, downloadable first-episode preview of about ten seconds. Of the publisher’s 8,400 listed episodes, **0 have passed full-length 1080p verification**. The stable release is pending.
+The **1.0.1 release candidate** lists 40 titles and 8,400 episodes. The current sources contain only first-episode previews of about ten seconds, giving **0 full episodes available in Sableen**. Guest playback and downloads require verified full episodes. The stable release is pending.
 
 <p align="center"><img src="docs/theater.webp" alt="The Sableen theater at phone and desktop widths, with live-action and animated titles side by side" width="900"></p>
 
 ## Catalog
 
-On November 22, 2026, the publisher listed 1,596 episodes across 20 live-action titles and 6,804 across 20 animated titles. The bundled catalogs retain all 8,400 episode IDs in published order. Each title has one playable first-episode preview. The release check compares episode IDs and order against the publisher and verifies each available file’s digest, duration, resolution and near-end frame. The table shows the video track duration from `ffprobe`. FFmpeg decoded a frame near the end of each file.
+On November 22, 2026, the publisher listed 1,596 episodes across 20 live-action titles and 6,804 across 20 animated titles. The bundled catalogs retain all 8,400 episode IDs in published order and the measurements for each first-episode preview. The release check compares episode IDs and order against the publisher and verifies each available file’s digest, duration, resolution and near-end frame. The table shows the video track duration from `ffprobe`. FFmpeg decoded a frame near the end of each file.
 
-| Chart and title | Episode ID | Listed duration | Video available in Sableen |
+| Chart and title | Episode ID | Listed duration | Video track in the public file |
 | --- | --- | ---: | --- |
 | Live-action · 少夫人来自东北3 | `7706514645208534041` | 178 s | 10.00 s · 360 × 640 · 25 fps |
 | Animated · 公路求生榜一说她要走到公路尽头第三季 | `7708355470964050969` | 115 s | 10.00 s · 640 × 360 · 30 fps |
 
-In fresh desktop Chrome sessions, Hongguo’s website played these episodes continuously to 178.48 s and 115.40 s. The public media files linked in the publisher’s episode metadata both end at about ten seconds. Sableen plays the available track to its end and displays decoded dimensions. [Live-action episode](https://hongguoduanju.com/player/7706512650816982040) · [Animated episode](https://hongguoduanju.com/player/7708355462780947518)
+In fresh desktop Chrome sessions, Hongguo’s website played these episodes continuously to 178.48 s and 115.40 s. The public media files linked in the publisher’s episode metadata both end at about ten seconds. The episode picker marks both as unavailable. [Live-action episode](https://hongguoduanju.com/player/7706512650816982040) · [Animated episode](https://hongguoduanju.com/player/7708355462780947518)
 
 ## Watching in Sableen
 
@@ -33,7 +33,7 @@ The theater opens in two columns and remembers the layout selected beside the ti
 
 A Windows profile build scrolled through 40 titles at `1264 × 681`. Aero recorded 363 frames with P95 build and raster times of 1.98 ms and 3.98 ms. Liquid recorded 364 frames at 1.82 ms and 3.72 ms respectively. The Flutter image cache peaked at 2.26 MiB in both runs. Peak process working sets were 194.6 MiB and 201.4 MiB respectively.
 
-Opening a title enters fullscreen. Tap the center to pause or continue, or tap the edge to reveal the controls. The episode picker lists every published episode number and the duration of available previews. “本应用尚未收录” means the app’s current catalog has no verified file for that episode. Tap the decoded dimensions to see the available resolutions. Switching between files preserves the playback position and play or pause state. Downloads use the selected file. Native players also list video tracks within the current file alongside separate files. Phones return to portrait after playback. Tablets and desktop windows retain their orientation. Visible windows can keep playing while unfocused. Hiding the app pauses playback. Supported Android devices and browsers offer picture-in-picture.
+Each title shows the number of available full episodes and the published episode count. Opening a title starts fullscreen playback when a full episode is available. Otherwise it opens the episode list. “暂无正片” marks episodes awaiting a verified full file. Tap the center of the player to pause or continue, or tap the edge to reveal the controls. Tap the decoded dimensions to see the available resolutions. Switching between files preserves the playback position and play or pause state. Downloads use the selected file. Native players also list video tracks within the current file alongside separate files. Phones return to portrait after playback. Tablets and desktop windows retain their orientation. Visible windows can keep playing while unfocused. Hiding the app pauses playback. Supported Android devices and browsers offer picture-in-picture.
 
 For long series, tap the episode range to jump between groups of 15. The player offers six playback speeds from 0.5× to 2×.
 

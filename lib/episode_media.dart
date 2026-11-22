@@ -1,20 +1,48 @@
 import 'src/rust/api/library.dart';
 
 extension DramaPlayback on Drama {
+  Drama forPlayback(Map<String, dynamic> renditions) {
+    final order = publishedIds ?? [for (final episode in episodes) episode.id];
+    final full = {
+      for (final e in episodes)
+        if (e.isFullLength && e.sha256 != null && (e.bytes ?? 0) > 0) e.id: e,
+    };
+    return Drama(
+      id: id,
+      title: title,
+      tags: tags,
+      cover: cover,
+      episodeCount: episodeCount,
+      publishedIds: order,
+      episodes: [
+        for (final id in order)
+          if (full[id] case final episode?)
+            episode.withPlaybackRenditions(renditions),
+      ],
+    );
+  }
+
   int? nextEpisodeIndex(int current) {
     final ids = publishedIds;
-    if (ids == null) return current + 1 < episodes.length ? current + 1 : null;
+    if (ids == null) {
+      final next = current + 1;
+      return next < episodes.length && episodes[next].isFullLength
+          ? next
+          : null;
+    }
     final position = ids.indexOf(episodes[current].id);
     if (position < 0 || position + 1 == ids.length) return null;
-    final next = episodes.indexWhere((e) => e.id == ids[position + 1]);
+    final next = episodes.indexWhere(
+      (e) => e.id == ids[position + 1] && e.isFullLength,
+    );
     return next < 0 ? null : next;
   }
 
-  int startingIndex({String? selectedId, Progress? last}) {
+  int? startingIndex({String? selectedId, Progress? last}) {
     final index = episodes.indexWhere(
       (e) => e.id == (selectedId ?? last?.episode),
     );
-    if (index >= 0) {
+    if (index >= 0 && episodes[index].isFullLength) {
       if (selectedId == null &&
           last != null &&
           last.completed &&
@@ -23,8 +51,9 @@ extension DramaPlayback on Drama {
       }
       return index;
     }
+    if (selectedId != null) return null;
     final firstFull = episodes.indexWhere((e) => e.isFullLength);
-    return firstFull >= 0 ? firstFull : 0;
+    return firstFull >= 0 ? firstFull : null;
   }
 }
 
@@ -33,9 +62,8 @@ extension EpisodeMedia on Episode {
       listedMs != null &&
       listedMs! > 0 &&
       durationMs != null &&
+      durationMs! > 0 &&
       (durationMs! - listedMs!).abs() <= 1000;
-  bool get isPreview =>
-      durationMs != null && listedMs != null && listedMs! > 0 && !isFullLength;
 
   bool replacesShorterCut(Progress prior) =>
       isFullLength &&

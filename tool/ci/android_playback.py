@@ -7,6 +7,9 @@ import sys
 import time
 from xml.etree import ElementTree
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from refresh_catalogs import has_full_file
+
 
 def screen():
     subprocess.run(['adb', 'shell', 'rm', '-f', '/data/local/tmp/sableen-window.xml'], check=True)
@@ -114,9 +117,10 @@ def main(check_offline=False):
     downloaded = []
     for label, key in [('红果短剧', 'hongguo'), ('红果漫剧', 'comic')]:
         title = json.loads(Path(f'assets/catalogs/{key}.json').read_text('utf8'))['dramas'][0]
-        episodes = title['episodes']
-        episode = next((e for e in episodes if e.get('listedMs', 0) > 0
-                        and abs(e['durationMs'] - e['listedMs']) <= 1000), episodes[0])
+        full = {e['id']: e for e in title['episodes'] if has_full_file(e)}
+        episode = next((full[item] for item in title['published_ids'] if item in full), None)
+        if episode is None:
+            raise ValueError(f"No full episode for playback verification of {title['title']}")
         aspect, frames = reference_frames(episode)
         tap(wait_for_node(lambda text: label in text, 60))
         tap(wait_for_node(lambda text: title['title'] in text, 60))

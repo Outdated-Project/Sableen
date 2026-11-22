@@ -5,10 +5,11 @@ from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import json
 from pathlib import Path
+import re
 import shutil
 import tempfile
 
-from refresh_catalogs import RANKS, fingerprint, media_snapshot
+from refresh_catalogs import RANKS, fingerprint, has_full_file, media_snapshot
 
 
 def stage_offline_shell(root):
@@ -46,13 +47,14 @@ def main():
     renditions = json.loads((catalog.parent / 'renditions/index.json').read_bytes())
     episodes = {file['sha256']: file for name in RANKS
                 for d in json.loads((catalog / f'{name}.json').read_bytes())['dramas']
-                for e in d['episodes'] for file in [e, *e.get('encodings', [])] if file['sha256'] not in renditions}
+                for e in d['episodes'] if has_full_file(e)
+                for file in [e, *e.get('encodings', [])] if file['sha256'] not in renditions}
     folder = root / 'media'
     folder.mkdir(exist_ok=True)
 
     def stage(entry):
         digest, episode = entry
-        if len(digest) != 64 or any(c not in '0123456789abcdef' for c in digest):
+        if not re.fullmatch('[0-9a-f]{64}', digest):
             raise ValueError('Invalid catalog digest')
         expected = {'bytes': episode['bytes'], 'sha256': digest}
         target = folder / f'{digest}.mp4'
@@ -67,6 +69,10 @@ def main():
 
     with ThreadPoolExecutor(max_workers=4) as pool:
         list(pool.map(stage, episodes.items()))
+    # Incremental builds can still contain MP4s staged from an older catalog.
+    for file in folder.glob('*.mp4'):
+        if re.fullmatch('[0-9a-f]{64}', file.stem) and file.stem not in episodes:
+            file.unlink()
     stage_offline_shell(root)
     print(f'Staged {len(episodes)} verified files in {folder}')
 
