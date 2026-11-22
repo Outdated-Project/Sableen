@@ -51,9 +51,16 @@ class DownloadQueue extends ChangeNotifier {
 
   static Future<String> _systemRoute(Uri url) async {
     final result = await SystemProxy.resolveDetailed(url);
-    if (result.error != null ||
-        !result.entries.any((e) => e.isSupportedByDartIo)) {
-      throw const HttpException('System proxy unavailable');
+    // A failed WPAD lookup can still return a manual proxy or a direct route.
+    if (result.error != null &&
+        result.entries.every((e) => e.isDirect) &&
+        (result.source == ProxySource.unknown ||
+            result.source == ProxySource.pac ||
+            result.pacUrl != null && result.source != ProxySource.manual)) {
+      throw HttpException('System proxy unavailable (${result.source.name})');
+    }
+    if (!result.entries.any((e) => e.isSupportedByDartIo)) {
+      throw const HttpException('Unsupported system proxy');
     }
     return result.toFindProxyString();
   }

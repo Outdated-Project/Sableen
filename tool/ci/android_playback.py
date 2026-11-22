@@ -48,6 +48,18 @@ def tap(node):
     subprocess.run(['adb', 'shell', 'input', 'tap', str((x1 + x2) // 2), str((y1 + y2) // 2)], check=True)
 
 
+def wait_for_downloads(count, timeout=60):
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        labels = [' '.join(node.get(key, '') for key in ('text', 'content-desc')) for node in screen().iter('node')]
+        failure = next((label for label in labels if '下载失败' in label), None)
+        if failure:
+            raise RuntimeError(failure)
+        if sum('已保存' in label for label in labels) >= count:
+            return
+    raise RuntimeError(f'Expected {count} saved downloads')
+
+
 def reference_frames(episode):
     url = episode['url']
     info = json.loads(subprocess.check_output(['ffprobe', '-v', 'error', '-rw_timeout', '15000000',
@@ -96,7 +108,8 @@ def observe_video(aspect, frames):
     raise RuntimeError(f'No advancing publisher frames detected. Minimum RGB difference {best:.1f}, first match {first}')
 
 
-def main():
+def main(check_offline=False):
+    downloaded = []
     for label, key in [('红果短剧', 'hongguo'), ('红果漫剧', 'comic')]:
         title = json.loads(Path(f'assets/catalogs/{key}.json').read_text('utf8'))['dramas'][0]
         aspect, frames = reference_frames(title['episodes'][0])
@@ -106,13 +119,45 @@ def main():
         center = ['adb', 'shell', 'input', 'tap', str(width // 2), str(height // 2)]
         subprocess.run(center, check=True)
         wait_for_node(playing, 30)
+        if check_offline:
+            tap(wait_for_node(lambda text: '离线下载' in text, 15))
+            action = '下载 ' + title['episodes'][0]['title']
+            tap(wait_for_node(lambda text: action in text, 15))
+            wait_for_downloads(len(downloaded) + 1)
+            subprocess.run(['adb', 'shell', 'input', 'keyevent', '4'], check=True)
+            wait_for_node(lambda text: '离线下载' in text, 15)
+            downloaded.append((label, title['title'], aspect, frames))
         subprocess.run(['adb', 'shell', 'input', 'keyevent', '4'], check=True)
         print(f'Installed release APK played {key}', flush=True)
+    if downloaded:
+        # The caller explicitly opts in on a disposable CI emulator.
+        if subprocess.check_output(['adb', 'shell', 'getprop', 'ro.kernel.qemu']).strip() != b'1':
+            raise RuntimeError('Disconnected playback test requires an emulator')
+        def shell(*args):
+            return subprocess.check_output(['adb', 'shell', *args], timeout=20)
+        try:
+            shell('svc', 'wifi', 'disable')
+            shell('svc', 'data', 'disable')
+            deadline = time.monotonic() + 15
+            while not re.search(rb'Active default network:\s*(none|null)', shell('dumpsys', 'connectivity'), re.I):
+                if time.monotonic() >= deadline:
+                    raise RuntimeError('Emulator still has a default network')
+                time.sleep(0.5)
+            for label, title, aspect, frames in downloaded:
+                shell('am', 'force-stop', 'com.example.sableen')
+                shell('am', 'start', '-W', '-n', 'com.example.sableen/.MainActivity')
+                tap(wait_for_node(lambda text: label in text, 30))
+                tap(wait_for_node(lambda text: title in text, 30))
+                observe_video(aspect, frames)
+                print(f'Cold-start offline playback verified: {title}', flush=True)
+        finally:
+            shell('svc', 'wifi', 'enable')
+            shell('svc', 'data', 'enable')
 
 
 if __name__ == '__main__':
     try:
-        main()
+        main(check_offline='--check-offline' in sys.argv[1:])
     except Exception:
         try:
             print('Current screen:', [n.get('content-desc') or n.get('text') for n in screen().iter('node')][:60], file=sys.stderr)
