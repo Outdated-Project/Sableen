@@ -37,6 +37,14 @@ Opening a title enters fullscreen. Tap the center to pause or continue, or tap t
 
 For long series, tap the episode range to jump between groups of 15. The player offers six playback speeds from 0.5× to 2×.
 
+Opening a series for the first time starts its earliest verified full episode when available. If a preview is replaced with its full episode, opening the series from that preview’s history starts the full cut at the beginning. Autoplay follows published episode order and stops when the next episode is missing.
+
+### Guest playback from a publisher feed
+
+To import full MP4s supplied by a content publisher, set `SABLEEN_PUBLISHER_FEED` to the public HTTPS feed URL and run `python tool/refresh_catalogs.py`. Run the source check in the same environment. GitHub Actions reads the repository variable of the same name. Viewers open the series directly. This repository has no Hongguo full-episode feed configured.
+
+The JSON object has `version` set to `1` and an `episodes` array. Each record contains string `seriesId` and `episodeId` fields, a one-based integer `episodeNumber`, the full cut’s `durationMs`, and a `files` array. Each file specifies its permanent public HTTPS `url` and `sha256`. Group all resolutions of the same cut into one record and include every delivery to retain in the feed. The refresh preserves the bundled series and rankings, matches IDs to published episode order, checks the source digest and video duration, and decodes a near-end frame. Playback and downloads use the measured renditions.
+
 In fresh desktop Chrome sessions, the official 785-episode picker for 《全球死考：刚下刑场你让我去考试一季》 played episodes 2 and 5 without signing in. Continuous frame measurements reached 170.53 and 101.10 seconds respectively, both at 640 × 360. Selecting episode 6 showed a prompt to continue in the official app. The Sableen catalog currently includes the first episode’s preview for this series. [Official episode 2](https://hongguoduanju.com/player/7697459724635098174/7697465811157404697)
 
 Recommendations use time spent watching each genre, with a 21-day half-life. Seeking and buffering add no viewing time. Search, preferences and history stay on the device. Viewing requires no Sableen account.

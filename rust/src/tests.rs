@@ -181,9 +181,11 @@ fn bundled_catalogs_have_unique_ids_and_valid_media() {
                     .episode_count
                     .is_some_and(|total| total >= drama.episodes.len() as u32)
             );
+            let series_page = format!("https://hongguoduanju.com/player/{}", drama.id);
             assert!(ids.insert(drama.id));
             for episode in drama.episodes {
-                assert!(episode.url.starts_with("https://hongguoduanju.com/"));
+                assert!(valid_address(&episode.url));
+                assert!(episode.page.is_some_and(|p| p.starts_with(&series_page)));
                 assert!(episode.sha256.is_some() && episode.bytes.is_some());
                 assert!(episode.duration_ms.is_some_and(|ms| ms > 0));
                 assert!(episode.listed_ms.is_some_and(|ms| ms > 0));

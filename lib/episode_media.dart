@@ -1,5 +1,33 @@
 import 'src/rust/api/library.dart';
 
+extension DramaPlayback on Drama {
+  int? nextEpisodeIndex(int current) {
+    final ids = publishedIds;
+    if (ids == null) return current + 1 < episodes.length ? current + 1 : null;
+    final position = ids.indexOf(episodes[current].id);
+    if (position < 0 || position + 1 == ids.length) return null;
+    final next = episodes.indexWhere((e) => e.id == ids[position + 1]);
+    return next < 0 ? null : next;
+  }
+
+  int startingIndex({String? selectedId, Progress? last}) {
+    final index = episodes.indexWhere(
+      (e) => e.id == (selectedId ?? last?.episode),
+    );
+    if (index >= 0) {
+      if (selectedId == null &&
+          last != null &&
+          last.completed &&
+          !episodes[index].replacesShorterCut(last)) {
+        return nextEpisodeIndex(index) ?? index;
+      }
+      return index;
+    }
+    final firstFull = episodes.indexWhere((e) => e.isFullLength);
+    return firstFull >= 0 ? firstFull : 0;
+  }
+}
+
 extension EpisodeMedia on Episode {
   bool get isFullLength =>
       listedMs != null &&
@@ -8,6 +36,12 @@ extension EpisodeMedia on Episode {
       (durationMs! - listedMs!).abs() <= 1000;
   bool get isPreview =>
       durationMs != null && listedMs != null && listedMs! > 0 && !isFullLength;
+
+  bool replacesShorterCut(Progress prior) =>
+      isFullLength &&
+      prior.episode == id &&
+      prior.durationMs > 0 &&
+      prior.durationMs + 1000 < durationMs!;
 
   Episode withEncoding(VideoEncoding file) => Episode(
     id: id,

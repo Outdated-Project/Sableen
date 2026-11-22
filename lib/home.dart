@@ -6,6 +6,7 @@ import 'package:material_ui/material_ui.dart';
 
 import 'design.dart';
 import 'drama_shelf.dart';
+import 'episode_media.dart';
 import 'library.dart';
 import 'offline.dart';
 import 'playback.dart';
@@ -52,17 +53,10 @@ class _HomeState extends State<Home> {
     if (enteringTheater) return;
     enteringTheater = true;
     try {
-      final last = library.latest(drama.id);
-      var episode = drama.episodes.indexWhere(
-        (e) => e.id == (selected?.id ?? last?.episode),
+      final episode = drama.startingIndex(
+        selectedId: selected?.id,
+        last: library.latest(drama.id),
       );
-      if (episode < 0) {
-        episode = 0;
-      } else if (selected == null &&
-          last!.completed &&
-          episode + 1 < drama.episodes.length) {
-        episode++;
-      }
       final fullscreen = setTheaterFullscreen(true);
       if (!kIsWeb) {
         await fullscreen;

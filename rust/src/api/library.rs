@@ -4,7 +4,8 @@ use std::collections::{HashMap, HashSet};
 use tzcraft::Duration;
 
 const MAX_HISTORY_BYTES: usize = 1 << 20;
-const MAX_CATALOG_BYTES: usize = 8 << 20;
+// A complete catalog can contain thousands of episodes with several file records each.
+const MAX_CATALOG_BYTES: usize = 64 << 20;
 const HISTORY_LIMIT: usize = 512;
 const WATCH_PRIOR_MS: f64 = 60_000.0;
 

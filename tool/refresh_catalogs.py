@@ -11,6 +11,7 @@ import time
 from urllib.parse import urlsplit
 from html.parser import HTMLParser
 from pathlib import Path
+from publisher_feed import load_feed
 
 
 ROOT = Path(__file__).resolve().parents[1] / 'assets' / 'catalogs'
@@ -63,7 +64,7 @@ class Publication(HTMLParser):
 
 def get(url):
     for attempt in range(2):
-        result = subprocess.run(['curl', '--silent', '--show-error', '--max-time', '20',
+        result = subprocess.run(['curl', '--disable', '--silent', '--show-error', '--max-time', '20',
                                  '--retry', '1', '--max-filesize', '2097152', '--proto', '=https',
                                  '--write-out', '\n%{http_code}', '--', url],
                                 capture_output=True, check=True, timeout=50)
@@ -87,7 +88,7 @@ def publication(url):
 def media_snapshot(url):
     with tempfile.TemporaryDirectory() as folder:
         path = Path(folder) / 'episode.mp4'
-        subprocess.run(['curl', '--fail', '--silent', '--show-error', '--max-time', '90',
+        subprocess.run(['curl', '--disable', '--fail', '--silent', '--show-error', '--max-time', '90',
                         '--retry', '1', '--max-filesize', '536870912', '--proto', '=https',
                         '--output', str(path), '--', url], check=True, timeout=190)
         yield path
@@ -115,7 +116,17 @@ def video_track(path):
     return round(seconds * 1000), width, height, track['codec_tag_string']
 
 
-def published_video(doc, series_id, page):
+def decode_end(path, duration):
+    frames = subprocess.check_output([
+        os.environ.get('SABLEEN_FFMPEG', 'ffmpeg'), '-nostdin', '-v', 'error', '-xerror', '-protocol_whitelist', 'file',
+        '-ss', f'{max(0, duration - 600) / 1000:.3f}', '-f', 'mov', '-i', str(path),
+        '-map', '0:v:0', '-frames:v', '1', '-f', 'framemd5', '-',
+    ], timeout=30, text=True)
+    if not any(row.startswith('0,') for row in frames.splitlines()):
+        raise ValueError(f'Cannot decode video near {duration} ms in {path.name}')
+
+
+def published_video(doc, series_id, page, *, include_metadata=False):
     """Follow the public season → episode → video links for this exact player page."""
     base = f'{HONGGUO}/player/{series_id}'
     match = re.fullmatch(re.escape(base) + r'(?:/(\d+))?', page)
@@ -160,7 +171,9 @@ def published_video(doc, series_id, page):
         if about is None or isinstance(about, dict) and about.get('@id') == episode['@id']:
             encodings.append(entry)
     video = {**video, 'encoding': encodings}
-    return (item_id, episode['episodeNumber'], video) if public_encodings(video, item_id) else None
+    if include_metadata or public_encodings(video, item_id):
+        return item_id, episode['episodeNumber'], video
+    return None
 
 
 def public_encodings(video, item_id):
@@ -237,7 +250,7 @@ def quality_files(primary, verified, listed):
 
 def playable_encodings(verified, listed, folder):
     from transcode_bytevc2 import prepare_rendition
-    candidates = list(verified)
+    candidates = [v for v in verified if v[5] == 'avc1' or v[5] in COMPATIBILITY_CODECS]
     converted = {}
     while candidates:
         primary = max(candidates, key=lambda v: (
@@ -264,7 +277,23 @@ def playable_encodings(verified, listed, folder):
     raise ValueError('No verified encoding could be prepared for playback')
 
 
-def hongguo_title(item):
+def episode_sources(resolved, item_id, number, delivery):
+    video = {}
+    if resolved:
+        if resolved[:2] != (item_id, number):
+            raise ValueError(f'Published episode identity changed for {item_id}')
+        video = resolved[2]
+    total = listed_ms(video)
+    urls = public_encodings(video, item_id)
+    if delivery:
+        if number != delivery.number or (total and abs(total - delivery.duration_ms) > 1000):
+            raise ValueError(f'Publisher feed disagrees with the episode listing for {item_id}')
+        total = total or delivery.duration_ms
+        urls = list(dict.fromkeys([*urls, *delivery.hashes]))
+    return total, urls
+
+
+def hongguo_title(item, feed=None):
     detail = item['url']
     series = published_series(detail)
     if not series:
@@ -273,31 +302,58 @@ def hongguo_title(item):
     episodes = []
     tags = []
     used = set()
-    for entry in sorted(series['episode'], key=lambda e: e['episodeNumber']):
+    supplied = (feed or {}).get(series_id, {})
+    entries = list(series['episode'])
+    listed_numbers = {entry['episodeNumber'] for entry in entries}
+    for item_id, delivery in supplied.items():
+        number = delivery.number
+        if number > len(series['published_ids']) or series['published_ids'][number-1] != item_id:
+            raise ValueError(f'Publisher feed disagrees with the episode order for {series_id}/{item_id}')
+        if number not in listed_numbers:
+            page = f'{HONGGUO}/player/{series_id}/{item_id}'
+            entries.append({'url': page, '@id': page + '#episode', 'episodeNumber': number})
+    for entry in sorted(entries, key=lambda e: e['episodeNumber']):
         page = entry['url']
-        if not re.fullmatch(re.escape(f'{HONGGUO}/player/{series_id}') + r'(?:/\d+)?', page):
+        match = re.fullmatch(re.escape(f'{HONGGUO}/player/{series_id}') + r'(?:/(\d+))?', page)
+        number = entry['episodeNumber']
+        if not match or type(number) is not int or not 1 <= number <= len(series['published_ids']):
             continue
-        resolved = published_video(publication(page), series_id, page)
-        if not resolved:
-            continue
-        item_id, number, video = resolved
-        if item_id in used or number != entry['episodeNumber'] or entry['@id'] != page + '#episode':
-            continue
-        if not 1 <= number <= len(series['published_ids']) or series['published_ids'][number-1] != item_id:
+        item_id = series['published_ids'][number-1]
+        if (match[1] or series['published_ids'][0]) != item_id or entry['@id'] != page + '#episode':
             raise ValueError(f'Episode order changed for {page}')
-        total = listed_ms(video)
+        if item_id in used:
+            continue
+        delivery = supplied.get(item_id)
+        resolved = (published_video(publication(page), series_id, page, include_metadata=delivery is not None)
+                    if number in listed_numbers else None)
+        total, urls = episode_sources(resolved, item_id, number, delivery)
+        if not urls:
+            continue
         verified = []
-        for url in public_encodings(video, item_id):
+        for url in urls:
+            supplied_file = delivery is not None and url in delivery.hashes
             try:
                 with media_snapshot(url) as path:
                     actual, width, height, codec = video_track(path)
-                    verified.append((url, actual, width, height, fingerprint(path), codec))
+                    evidence = fingerprint(path)
+                    if supplied_file:
+                        if (evidence['sha256'] != delivery.hashes[url] or abs(actual - delivery.duration_ms) > 1000
+                                or abs(actual - total) > 1000 or codec not in {'avc1', *COMPATIBILITY_CODECS}):
+                            raise ValueError(f'Publisher file does not match the full episode {item_id}')
+                        decode_end(path, actual)
+                    verified.append((url, actual, width, height, evidence, codec))
             except (subprocess.SubprocessError, ValueError, KeyError) as error:
+                if supplied_file:
+                    raise
                 print(f'Unavailable published media on {page}: {error}', flush=True)
         if not verified:
             raise ValueError(f'No usable published media on {page}')
         primary, choices, converted = playable_encodings(verified, total, ROOT.parent / 'renditions')
         media, actual, _, _, evidence, _ = primary
+        if delivery:
+            selected_sizes = {(primary[2], primary[3]), *((f['width'], f['height']) for f in choices)}
+            if abs(actual - total) > 1000 or any(v[2:4] not in selected_sizes for v in verified if v[0] in delivery.hashes):
+                raise ValueError(f'Incomplete publisher renditions for {item_id}')
         mirrors = [url for url, _, _, _, other, _ in verified if url != media and other == evidence][:3]
         label = f'第{number}集'
         if not total or abs(actual - total) > 1000:
@@ -310,7 +366,8 @@ def hongguo_title(item):
         if converted:
             episodes[-1]['_renditions'] = converted
         used.add(item_id)
-        tags.extend(video.get('genre') or [])
+        if resolved:
+            tags.extend(resolved[2].get('genre') or [])
     if episodes:
         return {'id': series_id, 'title': series['name'], 'tags': list(dict.fromkeys(tags)) or ['短剧'],
                 'cover': item.get('image'), 'episode_count': series.get('numberOfEpisodes'),
@@ -374,13 +431,27 @@ def poster(publisher, drama, primary):
 def main():
     covers = set()
     renditions = {}
+    prepared = {}
+    feed_url = os.environ.get('SABLEEN_PUBLISHER_FEED')
+    feed = load_feed(feed_url)
+    existing = {}
+    if feed_url:
+        for category in RANKS:
+            existing[category] = json.loads((ROOT / f'{category}.json').read_bytes())['dramas']
+        unknown = feed.keys() - {d['id'] for dramas in existing.values() for d in dramas}
+        if unknown:
+            raise ValueError(f'Publisher feed contains series outside these catalogs: {sorted(unknown)}')
     with (concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool,
           concurrent.futures.ThreadPoolExecutor(max_workers=2) as images):
         for category, slug in RANKS.items():
-            rank = publication(f'{HONGGUO}/rank/{slug}')
-            items = next(n['itemListElement'] for n in rank.nodes if n.get('@type') == 'ItemList')
+            if feed_url:
+                items = [{'url': f'{HONGGUO}/detail?series_id={d["id"]}', 'image': d.get('cover')}
+                         for d in existing[category]]
+            else:
+                rank = publication(f'{HONGGUO}/rank/{slug}')
+                items = next(n['itemListElement'] for n in rank.nodes if n.get('@type') == 'ItemList')
             titles, pending, primary = [], [], {}
-            for drama in pool.map(hongguo_title, items):
+            for drama in pool.map(lambda item: hongguo_title(item, feed), items):
                 if drama is None:
                     continue
                 for episode in drama['episodes']:
@@ -392,13 +463,19 @@ def main():
                 pending.append(images.submit(poster, category, drama, primary[url]))
             for future in pending:
                 future.result()
-            save(category, titles)
+            if not titles or (feed_url and len(titles) != len(items)):
+                raise ValueError(f'Incomplete refresh for {category}')
+            prepared[category] = titles
             covers.update(f"{category}-{d['episodes'][0]['id']}.webp" for d in titles)
     folder = ROOT.parent / 'renditions'
-    with tempfile.NamedTemporaryFile(dir=folder, delete=False, mode='w', encoding='utf-8') as index:
-        json.dump(renditions, index, indent=2, sort_keys=True)
-        index.write('\n')
-    os.replace(index.name, folder / 'index.json')
+    # Keep both generations playable while the two catalogs are being replaced.
+    folder.mkdir(parents=True, exist_ok=True)
+    index = folder / 'index.json'
+    previous = json.loads(index.read_bytes()) if index.exists() else {}
+    write_renditions(folder, {**previous, **renditions})
+    for category, titles in prepared.items():
+        save(category, titles)
+    write_renditions(folder, renditions)
     retained = {r['sha256'] for r in renditions.values()}
     for old in folder.glob('*.mp4'):
         if re.fullmatch('[a-f0-9]{64}', old.stem) and old.stem not in retained:
@@ -407,6 +484,13 @@ def main():
         for old in (ROOT.parent / 'posters').glob(f'{category}-*.webp'):
             if old.name not in covers:
                 old.unlink()
+
+
+def write_renditions(folder, renditions):
+    with tempfile.NamedTemporaryFile(dir=folder, delete=False, mode='w', encoding='utf-8') as index:
+        json.dump(renditions, index, indent=2, sort_keys=True)
+        index.write('\n')
+    os.replace(index.name, folder / 'index.json')
 
 
 if __name__ == '__main__':

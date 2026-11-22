@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:material_ui/material_ui.dart';
 
 import 'design.dart';
+import 'episode_media.dart';
 import 'library.dart';
 import 'src/rust/api/library.dart';
 
@@ -20,7 +21,7 @@ class DramaShelf extends StatelessWidget {
   final Library library;
   final List<Drama> titles;
   final int columns;
-  final void Function(Drama, ImageProvider) onOpen;
+  final void Function(Drama, ImageProvider, Episode?) onOpen;
   final String emptyText;
   final bool history;
 
@@ -61,12 +62,13 @@ class DramaShelf extends StatelessWidget {
           itemBuilder: (context, index) {
             final drama = titles[index];
             final origin = library.publishers[drama.id]!;
-            final progress = history ? library.latest(drama.id) : null;
+            final last = library.latest(drama.id);
+            final progress = history ? last : null;
             final ep =
-                drama.episodes
-                    .where((e) => e.id == progress?.episode)
-                    .firstOrNull ??
-                drama.episodes.first;
+                drama.episodes[drama.startingIndex(
+                  last: last,
+                  selectedId: progress?.episode,
+                )];
             final category = origin == Publisher.comic
                 ? context.zh('红果漫剧', '紅果漫劇')
                 : context.zh('红果短剧', '紅果短劇');
@@ -136,7 +138,7 @@ class DramaShelf extends StatelessWidget {
                   style: Theme.of(context).textTheme.bodySmall
                       ?.copyWith(color: colors.onSurfaceVariant),
                 ),
-                if (progress != null)
+                if (progress != null && !ep.replacesShorterCut(progress))
                   Padding(
                     padding: const EdgeInsets.only(top: 6),
                     child: Semantics(
@@ -168,7 +170,7 @@ class DramaShelf extends StatelessWidget {
               ),
               clipBehavior: Clip.antiAlias,
               child: InkWell(
-                onTap: () => onOpen(drama, image),
+                onTap: () => onOpen(drama, image, progress == null ? null : ep),
                 child: horizontal
                     ? Row(
                         crossAxisAlignment: CrossAxisAlignment.stretch,

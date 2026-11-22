@@ -61,7 +61,9 @@ def wait_for_downloads(count, timeout=60):
 
 
 def reference_frames(episode):
-    url = episode['url']
+    renditions = Path('assets/renditions')
+    converted = json.loads((renditions / 'index.json').read_bytes()).get(episode['sha256'])
+    url = str(renditions / (converted['sha256'] + '.mp4')) if converted else episode['url']
     info = json.loads(subprocess.check_output(['ffprobe', '-v', 'error', '-rw_timeout', '15000000',
         '-select_streams', 'v:0', '-show_entries', 'stream=width,height', '-of', 'json', url], timeout=30))['streams'][0]
     frames = subprocess.check_output(['ffmpeg', '-nostdin', '-v', 'error', '-rw_timeout', '15000000',
@@ -112,7 +114,10 @@ def main(check_offline=False):
     downloaded = []
     for label, key in [('红果短剧', 'hongguo'), ('红果漫剧', 'comic')]:
         title = json.loads(Path(f'assets/catalogs/{key}.json').read_text('utf8'))['dramas'][0]
-        aspect, frames = reference_frames(title['episodes'][0])
+        episodes = title['episodes']
+        episode = next((e for e in episodes if e.get('listedMs', 0) > 0
+                        and abs(e['durationMs'] - e['listedMs']) <= 1000), episodes[0])
+        aspect, frames = reference_frames(episode)
         tap(wait_for_node(lambda text: label in text, 60))
         tap(wait_for_node(lambda text: title['title'] in text, 60))
         width, height = observe_video(aspect, frames)
@@ -121,7 +126,7 @@ def main(check_offline=False):
         wait_for_node(playing, 30)
         if check_offline:
             tap(wait_for_node(lambda text: '离线下载' in text, 15))
-            action = '下载 ' + title['episodes'][0]['title']
+            action = '下载 ' + episode['title']
             tap(wait_for_node(lambda text: action in text, 15))
             wait_for_downloads(len(downloaded) + 1)
             subprocess.run(['adb', 'shell', 'input', 'keyevent', '4'], check=True)

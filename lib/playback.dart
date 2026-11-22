@@ -165,8 +165,9 @@ class _TheaterState extends State<Theater> with WidgetsBindingObserver {
         completed = true;
         _save();
         _cadence();
-        if (!background && index + 1 < widget.drama.episodes.length) {
-          unawaited(_open(index + 1));
+        final next = widget.drama.nextEpisodeIndex(index);
+        if (!background && next != null) {
+          unawaited(_open(next));
         } else {
           _update();
         }
@@ -253,7 +254,10 @@ class _TheaterState extends State<Theater> with WidgetsBindingObserver {
     episode = file ?? widget.drama.episodes[index];
     final prior = widget.library.latest(widget.drama.id, episode.id);
     previous =
-        resumeMs ?? (prior == null || prior.completed ? 0 : prior.positionMs);
+        resumeMs ??
+        (prior == null || prior.completed || episode.replacesShorterCut(prior)
+            ? 0
+            : prior.positionMs);
     previous = _contentPosition(previous);
     pendingWebStart = kIsWeb && previous > 0 ? previous : null;
     skippedBreak = null;
@@ -497,14 +501,25 @@ class _TheaterState extends State<Theater> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    final surface = Video(
-      controller: video,
-      controls: null,
-      pauseUponEnteringBackgroundMode: false,
-      subtitleViewConfiguration: const SubtitleViewConfiguration(
-        visible: false,
-      ),
-    );
+    final surface = kIsWeb
+        // media_kit registers one HTML video element per controller. Keep its
+        // view mounted while track dimensions reset so Chrome can finish play().
+        ? ValueListenableBuilder<int?>(
+            valueListenable: video.id,
+            builder: (_, id, _) => id == null
+                ? const SizedBox.shrink()
+                : HtmlElementView(
+                    viewType: 'com.alexmercerind.media_kit_video.$id',
+                  ),
+          )
+        : Video(
+            controller: video,
+            controls: null,
+            pauseUponEnteringBackgroundMode: false,
+            subtitleViewConfiguration: const SubtitleViewConfiguration(
+              visible: false,
+            ),
+          );
     final controls = Row(
       children: [
         IconButton.filled(

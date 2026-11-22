@@ -89,6 +89,8 @@ jobs:
   sources:
     runs-on: ubuntu-24.04
     timeout-minutes: 12
+    env:
+      SABLEEN_PUBLISHER_FEED: ${{ vars.SABLEEN_PUBLISHER_FEED }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with: {persist-credentials: false}

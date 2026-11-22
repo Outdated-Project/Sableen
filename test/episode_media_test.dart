@@ -5,6 +5,41 @@ import 'package:sableen/episode_picker.dart';
 import 'package:sableen/src/rust/api/library.dart';
 
 void main() {
+  test(
+    'A full episode is preferred to previews and replaces old preview progress',
+    () {
+      final show = Drama(
+        id: 'show',
+        title: 'Series',
+        tags: const [],
+        episodes: [
+          for (final (id, time) in [('1', 10000), ('2', 171000), ('3', 171000)])
+            Episode(
+              id: id,
+              title: id,
+              url: 'https://example.org/$id.mp4',
+              durationMs: time,
+              listedMs: 171000,
+            ),
+        ],
+      );
+      Progress history(int duration) => Progress(
+        drama: 'show',
+        episode: '2',
+        positionMs: duration,
+        durationMs: duration,
+        watchedMs: duration,
+        updated: 0,
+        completed: true,
+      );
+      expect(show.startingIndex(), 1);
+      expect(show.startingIndex(selectedId: '1'), 0);
+      expect(show.startingIndex(last: history(10000)), 1);
+      expect(show.episodes[1].replacesShorterCut(history(10000)), isTrue);
+      expect(show.startingIndex(last: history(171000)), 2);
+      expect(show.startingIndex(selectedId: '2', last: history(171000)), 1);
+    },
+  );
   testWidgets('A sparse catalog opens the current published episode range', (
     tester,
   ) async {
@@ -24,6 +59,8 @@ void main() {
           ),
       ],
     );
+    expect(drama.nextEpisodeIndex(0), isNull);
+    expect(drama.nextEpisodeIndex(1), isNull);
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(body: EpisodePicker(drama: drama, current: 1)),

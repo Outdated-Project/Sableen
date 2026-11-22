@@ -32,10 +32,43 @@ const server = http.createServer((req, res) => {
   fs.createReadStream(file).pipe(res);
 });
 
+async function checkEpisodeTransition(browser, url) {
+  const catalog = JSON.parse(fs.readFileSync(path.join(root, 'assets/assets/catalogs/hongguo.json')));
+  const [first, second] = catalog.dramas;
+  const episodes = [first.episodes[0], second.episodes[0]].map((e, i) => ({
+    ...e, title: `第${i + 1}集`, listedMs: e.durationMs,
+    page: `https://hongguoduanju.com/player/${first.id}/${e.id}`,
+  }));
+  const fixture = {...first, title: 'Sableen transition test', published_ids: episodes.map(e => e.id), episode_count: 2, episodes};
+  const context = await browser.newContext({serviceWorkers: 'block'});
+  try {
+    await context.route('**/assets/assets/catalogs/hongguo.json', route => route.fulfill({json: {version: 1, dramas: [fixture]}}));
+    const page = await context.newPage();
+    await page.goto(url);
+    await page.locator('flt-semantics-placeholder').dispatchEvent('click');
+    await page.getByRole('button', {name: /Sableen transition test/}).first().press('Enter');
+    await page.waitForFunction(() => document.querySelector('video')?.currentTime > .25);
+    const element = await page.locator('video').elementHandle();
+    const original = await element.evaluate(v => v.currentSrc);
+    // Trigger the real ended event and observe the next source playing in the same view.
+    await element.evaluate(v => { v.currentTime = v.duration - .5; });
+    await page.waitForFunction(({element, original}) => element.isConnected && element.currentSrc !== original &&
+      !element.paused && element.videoWidth > 0 && element.currentTime > .25, {element, original});
+    await page.mouse.move(80, 75);
+    await page.getByRole('button', {name: '选集'}).press('Enter');
+    await page.getByText('第1集', {exact: true}).last().click();
+    await page.waitForFunction(({element, original}) => element.isConnected && element.currentSrc === original &&
+      !element.paused && element.currentTime > .25, {element, original});
+  } finally {
+    await context.close();
+  }
+}
+
 async function test() {
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const browser = await chromium.launch({ channel: 'chrome' });
   try {
+    await checkEpisodeTransition(browser, `http://127.0.0.1:${server.address().port}`);
     const context = await browser.newContext({ viewport: { width: 1000, height: 780 } });
     const page = await context.newPage();
     const errors = [];
@@ -47,7 +80,8 @@ async function test() {
     const renditions = JSON.parse(fs.readFileSync(path.join(root, 'assets/assets/renditions/index.json'), 'utf8'));
     const titles = [['红果短剧', 'hongguo'], ['红果漫剧', 'comic']].map(([label, file]) => {
       const drama = JSON.parse(fs.readFileSync(path.join(root, 'assets/assets/catalogs', file + '.json'), 'utf8')).dramas[0];
-      return [label, drama.title, drama.episodes[0], drama.episode_count];
+      const episode = drama.episodes.find(e => e.listedMs > 0 && e.durationMs > 0 && Math.abs(e.listedMs - e.durationMs) <= 1000) ?? drama.episodes[0];
+      return [label, drama.title, episode, drama.episode_count, drama.published_ids.indexOf(episode.id)];
     });
     for (const [, title] of titles) await page.getByRole('button', { name: new RegExp(title) }).first().waitFor();
     const firstRow = await Promise.all(titles.map(([, title]) => page.getByRole('button', { name: new RegExp(title) }).first().boundingBox()));
@@ -56,7 +90,7 @@ async function test() {
     await page.getByRole('button', { name: '切换为单列' }).press('Enter');
     await page.getByRole('button', { name: '切换为双列' }).press('Enter');
     const savedSizes = new Map();
-    for (const [publisher, title, episode, total] of titles) {
+    for (const [publisher, title, episode, total, index] of titles) {
       console.log('Testing', publisher, title);
       await page.getByRole('checkbox', { name: publisher }).press('Space');
       await page.getByRole('button', { name: new RegExp(title) }).first().press('Enter');
@@ -66,7 +100,12 @@ async function test() {
       }, null, { timeout: 45000 });
       await page.mouse.move(80, 60);
       await page.getByRole('button', { name: '选集' }).press('Enter');
-      await page.getByRole('button', {name: '1–15', exact: true}).waitFor();
+      if (total > 15) {
+        const first = Math.floor(index / 15) * 15 + 1;
+        await page.getByRole('button', {name: `${first}–${Math.min(first + 14, total)}`, exact: true}).waitFor();
+      } else {
+        await page.getByText(`全 ${total} 集`, {exact: false}).first().waitFor();
+      }
       assert((await page.locator('body').ariaSnapshot()).includes(`全 ${total} 集`));
       await page.keyboard.press('Escape');
       let saved = episode;
@@ -107,12 +146,17 @@ async function test() {
       await page.mouse.move(70, 70);
       await page.getByRole('button', { name: '离线下载' }).first().press('Enter');
       await page.getByRole('button', { name: `下载 ${episode.title}`, exact: true }).press('Enter');
-      const suffix = savedSizes.has(title) ? ` · ${saved.width}×${saved.height}` : '';
+      const downloadedSize = episode.encodings?.find(f => f.sha256 === saved.sha256);
+      const suffix = downloadedSize ? ` · ${downloadedSize.width}×${downloadedSize.height}` : '';
       await page.getByRole('group', { name: `${title} · ${episode.title}${suffix} 已保存`, exact: true }).waitFor();
-      await page.waitForFunction(async hash => {
+      const digest = renditions[saved.sha256]?.sha256 ?? saved.sha256;
+      assert.equal(await page.evaluate(async hash => {
         const cache = await caches.open('sableen-episodes-v1');
-        return !!(await cache.match(new URL(`media/${hash}.mp4`, document.baseURI)));
-      }, renditions[saved.sha256]?.sha256 ?? saved.sha256);
+        const response = await cache.match(new URL(`media/${hash}.mp4`, document.baseURI));
+        const bytes = await response.arrayBuffer();
+        const verified = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
+        return Array.from(verified, b => b.toString(16).padStart(2, '0')).join('');
+      }, digest), digest);
       await page.keyboard.press('Escape');
       await page.mouse.move(100, 70);
       assert.equal(page.context().pages().length, 1);

@@ -6,6 +6,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:sableen/design.dart';
+import 'package:sableen/episode_media.dart';
 import 'package:sableen/home.dart';
 import 'package:sableen/library.dart';
 import 'package:sableen/offline.dart';
@@ -180,8 +181,9 @@ void main() {
             !player().state.playing &&
             find.byTooltip('离线下载').hitTestable().evaluate().isNotEmpty,
       );
-      final episode = library.byId[id]!.episodes.first;
-      final ids = library.byId[id]!.publishedIds!;
+      final drama = library.byId[id]!;
+      final episode = drama.episodes[drama.startingIndex()];
+      final ids = drama.publishedIds!;
       await tester.tap(find.byTooltip('播放倍速'));
       await tester.pumpAndSettle();
       await tester.tap(find.widgetWithText(ListTile, '1.5×'));
@@ -193,25 +195,30 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byTooltip('选集'));
       await tester.pumpAndSettle();
-      final start = (ids.length - 1) ~/ 15 * 15 + 1;
-      await tester.tap(find.text('1–15'));
-      await tester.pumpAndSettle();
-      final ranges = tester
-          .state<ScrollableState>(
-            find
-                .descendant(
-                  of: find.byType(GridView),
-                  matching: find.byType(Scrollable),
-                )
-                .last,
-          )
-          .position;
-      ranges.jumpTo(ranges.maxScrollExtent);
-      await tester.pumpAndSettle();
-      await tester.tap(
-        find.widgetWithText(OutlinedButton, '$start–${ids.length}'),
-      );
-      await tester.pumpAndSettle();
+      if (ids.length > 15) {
+        final first = ids.indexOf(episode.id) ~/ 15 * 15 + 1;
+        final lastGroup = (ids.length - 1) ~/ 15 * 15 + 1;
+        await tester.tap(
+          find.text('$first–${(first + 14).clamp(1, ids.length)}'),
+        );
+        await tester.pumpAndSettle();
+        final ranges = tester
+            .state<ScrollableState>(
+              find
+                  .descendant(
+                    of: find.byType(GridView),
+                    matching: find.byType(Scrollable),
+                  )
+                  .last,
+            )
+            .position;
+        ranges.jumpTo(ranges.maxScrollExtent);
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.widgetWithText(OutlinedButton, '$lastGroup–${ids.length}'),
+        );
+        await tester.pumpAndSettle();
+      }
       final list = find
           .descendant(
             of: find.byType(ListView).last,

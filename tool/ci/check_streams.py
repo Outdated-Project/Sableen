@@ -4,27 +4,19 @@ from concurrent.futures import ThreadPoolExecutor
 import json
 import os
 import re
-import subprocess
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from refresh_catalogs import (COMPATIBILITY_CODECS, HONGGUO, RANKS, ROOT, video_track, fingerprint, listed_ms,
-                              media_snapshot, public_encodings, publication, published_series, published_video)
-
-
-def decode_end(path, duration):
-    frames = subprocess.check_output([
-        os.environ.get('SABLEEN_FFMPEG', 'ffmpeg'), '-nostdin', '-v', 'error', '-xerror', '-protocol_whitelist', 'file',
-        '-ss', f'{max(0, duration - 600) / 1000:.3f}', '-f', 'mov', '-i', str(path),
-        '-map', '0:v:0', '-frames:v', '1', '-f', 'framemd5', '-',
-    ], timeout=30, text=True)
-    if not any(row.startswith('0,') for row in frames.splitlines()):
-        raise ValueError(f'Cannot decode video near {duration} ms in {path.name}')
+from publisher_feed import load_feed
+from refresh_catalogs import (COMPATIBILITY_CODECS, HONGGUO, RANKS, ROOT, decode_end, episode_sources, video_track,
+                              fingerprint, media_snapshot, publication, published_series, published_video)
 
 
 def check_file(path, source_hash):
     duration, width, height, codec = video_track(path)
+    if codec != 'avc1' and codec not in COMPATIBILITY_CODECS:
+        raise ValueError(f'Unsupported playback codec {codec} for {source_hash}')
     decode_end(path, duration)
     if codec in COMPATIBILITY_CODECS:
         record = json.loads((ROOT.parent / 'renditions/index.json').read_bytes())[source_hash]
@@ -38,26 +30,29 @@ def check_file(path, source_hash):
     return duration, width, height, codec
 
 
-def check(record):
+def check(record, feed=None, listed_pages=None):
     series, episode = record
     page = episode['page']
     if not re.fullmatch(re.escape(HONGGUO) + rf'/player/{re.escape(series)}(?:/{re.escape(episode["id"])})?', page):
         raise ValueError('Invalid player page')
     media = episode['url']
-    resolved = published_video(publication(page), series, page)
-    if not resolved or resolved[0] != episode['id']:
+    item_id = episode['id']
+    delivery = (feed or {}).get(series, {}).get(item_id)
+    from_page = not delivery or listed_pages is None or page in listed_pages[series]
+    resolved = published_video(publication(page), series, page, include_metadata=delivery is not None) if from_page else None
+    if not resolved and not delivery:
         raise ValueError(f'Published episode or video changed on {page}')
-    item_id, number, video = resolved
-    urls = public_encodings(video, item_id)
+    number = delivery.number if delivery else resolved[1]
+    listed, urls = episode_sources(resolved, item_id, number, delivery)
     if media not in urls:
         raise ValueError(f'Published media changed on {page}')
     for mirror in episode.get('mirrors', []):
         if mirror not in urls:
             raise ValueError(f'Unlisted mirror on {page}')
         with media_snapshot(mirror) as path:
-            if fingerprint(path)['sha256'] != episode['sha256']:
+            if (fingerprint(path)['sha256'] != episode['sha256'] or
+                    delivery and delivery.hashes.get(mirror, episode['sha256']) != episode['sha256']):
                 raise ValueError(f'Mirror bytes changed on {page}')
-    listed = listed_ms(video)
     with media_snapshot(media) as path:
         if any(episode.get(key) != value for key, value in fingerprint(path).items()):
             raise ValueError(f'Media bytes changed on {page}')
@@ -87,6 +82,12 @@ def check(record):
     if abs(measured - episode['durationMs']) > 250 or listed != episode['listedMs']:
         raise ValueError(f'Media duration changed on {page}')
     full = listed > 0 and abs(listed - measured) <= 1000
+    if delivery:
+        if not full or abs(measured - delivery.duration_ms) > 1000:
+            raise ValueError(f'Incomplete publisher episode on {page}')
+        for file in [episode, *episode.get('encodings', [])]:
+            if delivery.hashes.get(file['url'], file['sha256']) != file['sha256']:
+                raise ValueError(f'Publisher file digest changed on {page}')
     sizes.add((width, height))
     missing_sizes = set()
     for url in urls:
@@ -94,6 +95,11 @@ def check(record):
             continue
         with media_snapshot(url) as path:
             actual, w, h, _ = video_track(path)
+            if delivery and url in delivery.hashes:
+                if fingerprint(path)['sha256'] != delivery.hashes[url] or abs(actual - delivery.duration_ms) > 1000:
+                    raise ValueError(f'Publisher file differs on {page}')
+                if (w, h) not in sizes:
+                    missing_sizes.add((w, h))
             if abs(actual - measured) <= 250 and (listed > 0 and abs(actual - listed) <= 1000) == full and (w, h) not in sizes:
                 decode_end(path, actual)
                 missing_sizes.add((w, h))
@@ -118,6 +124,7 @@ def main():
     parser.add_argument('--require-episodes', action='store_true')
     parser.add_argument('--report', type=Path, help='Write the measured tracks and episode identities as JSON')
     args = parser.parse_args()
+    feed = load_feed(os.environ.get('SABLEEN_PUBLISHER_FEED'))
     if {p.stem for p in ROOT.glob('*.json')} != set(RANKS):
         raise ValueError('Unexpected bundled catalogs')
     missing = []
@@ -129,8 +136,10 @@ def main():
             records = [(d['id'], e) for d in dramas for e in d['episodes']]
             if not records:
                 raise ValueError(f'{category} has no media')
-            tracks = list(pool.map(check, records))
-            seasons = pool.map(published_series, [f'{HONGGUO}/detail?series_id={d["id"]}' for d in dramas])
+            seasons = list(pool.map(published_series, [f'{HONGGUO}/detail?series_id={d["id"]}' for d in dramas]))
+            listed_pages = {d['id']: {e['url'] for e in (season or {}).get('episode', [])}
+                            for d, season in zip(dramas, seasons)}
+            tracks = list(pool.map(lambda record: check(record, feed, listed_pages), records))
             complete = 0
             by_series = {d['id']: [] for d in dramas}
             for track in tracks:
