@@ -87,16 +87,18 @@ def fingerprint(path):
     return {'bytes': path.stat().st_size, 'sha256': digest.hexdigest()}
 
 
-def duration(path):
-    result = subprocess.run(['ffprobe', '-v', 'error', '-protocol_whitelist', 'file', '-f', 'mov',
+def video_track(path):
+    result = subprocess.run([os.environ.get('SABLEEN_FFPROBE', 'ffprobe'), '-v', 'error', '-protocol_whitelist', 'file', '-f', 'mov',
                              '-select_streams', 'v:0', '-show_entries',
-                             'stream=codec_name:format=duration', '-of', 'json', str(path)],
+                             'stream=width,height,duration,codec_tag_string:format=duration', '-of', 'json', str(path)],
                             capture_output=True, check=True, timeout=25)
     probe = json.loads(result.stdout)
-    seconds = float(probe['format']['duration'])
-    if not probe['streams'] or not math.isfinite(seconds) or seconds <= 0:
+    track = next(iter(probe['streams']), {})
+    seconds = float(track.get('duration', probe['format']['duration']))
+    width, height = track.get('width', 0), track.get('height', 0)
+    if not math.isfinite(seconds) or seconds <= 0 or min(width, height) <= 0:
         raise ValueError(f'Invalid video at {path}')
-    return seconds
+    return round(seconds * 1000), width, height, track['codec_tag_string']
 
 
 def published_video(doc, series_id, page):
@@ -182,21 +184,26 @@ def hongguo_title(item):
         for url in public_encodings(video, item_id):
             try:
                 with media_snapshot(url) as path:
-                    actual = round(duration(path) * 1000)
-                    verified.append((url, actual, fingerprint(path)))
+                    actual, width, height, codec = video_track(path)
+                    verified.append((url, actual, width, height, fingerprint(path), codec))
             except (subprocess.SubprocessError, ValueError, KeyError) as error:
                 print(f'Unavailable published media on {page}: {error}', flush=True)
         if not verified:
             raise ValueError(f'No usable published media on {page}')
-        # Prefer a duration-matched publication, retaining publisher order on ties.
-        media, actual, evidence = max(verified, key=lambda v: bool(total) and abs(v[1] - total) <= 1000)
-        mirrors = [url for url, _, other in verified if url != media and other == evidence][:3]
+        # Prefer a full episode, then the highest measured resolution.
+        media, actual, _, _, evidence, codec = max(verified, key=lambda v: (
+            bool(total) and abs(v[1] - total) <= 1000,
+            min(v[2:4]) >= 1080 and max(v[2:4]) >= 1920, v[2] * v[3], v[1]))
+        mirrors = [url for url, _, _, _, other, _ in verified if url != media and other == evidence][:3]
         label = f'第{number}集'
         if not total or abs(actual - total) > 1000:
             label += f' · {round(actual / 1000)} 秒片段'
         episodes.append({'id': item_id, 'title': label, 'url': media, 'page': page,
                          'durationMs': actual, 'listedMs': total, **evidence,
                          **({'mirrors': mirrors} if mirrors else {})})
+        if codec == 'bvc2':
+            from transcode_bytevc2 import prepare_rendition
+            episodes[-1]['_rendition'] = prepare_rendition(media, evidence, ROOT.parent / 'renditions')
         used.add(item_id)
         tags.extend(video.get('genre') or [])
     if episodes:
@@ -260,6 +267,7 @@ def poster(publisher, drama, primary):
 
 def main():
     covers = set()
+    renditions = {}
     with (concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool,
           concurrent.futures.ThreadPoolExecutor(max_workers=2) as images):
         for category, slug in RANKS.items():
@@ -269,6 +277,9 @@ def main():
             for drama in pool.map(hongguo_title, items):
                 if drama is None:
                     continue
+                for episode in drama['episodes']:
+                    if rendition := episode.pop('_rendition', None):
+                        renditions[episode['sha256']] = rendition
                 titles.append(drama)
                 url = drama.get('cover')
                 if url not in primary:
@@ -278,6 +289,15 @@ def main():
                 future.result()
             save(category, titles)
             covers.update(f"{category}-{d['episodes'][0]['id']}.webp" for d in titles)
+    folder = ROOT.parent / 'renditions'
+    with tempfile.NamedTemporaryFile(dir=folder, delete=False, mode='w', encoding='utf-8') as index:
+        json.dump(renditions, index, indent=2, sort_keys=True)
+        index.write('\n')
+    os.replace(index.name, folder / 'index.json')
+    retained = {r['sha256'] for r in renditions.values()}
+    for old in folder.glob('*.mp4'):
+        if re.fullmatch('[a-f0-9]{64}', old.stem) and old.stem not in retained:
+            old.unlink()
     for category in RANKS:
         for old in (ROOT.parent / 'posters').glob(f'{category}-*.webp'):
             if old.name not in covers:

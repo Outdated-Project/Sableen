@@ -11,8 +11,10 @@ class Preferences extends ChangeNotifier {
   String language = 'system';
   Glass glass = Glass.solid;
   Palette palette = Palette.dynamic;
+  int columns = 2;
   Future<void> restore() async {
     language = await disk.getString('language') ?? 'system';
+    columns = await disk.getString('columns') == '1' ? 1 : 2;
     final g = await disk.getString('glass'),
         p = await disk.getString('palette');
     glass = Glass.values.where((v) => v.name == g).firstOrNull ?? Glass.solid;
@@ -23,6 +25,8 @@ class Preferences extends ChangeNotifier {
   Future<void> save(String key, String value) async {
     await disk.setString(key, value);
     switch (key) {
+      case 'columns':
+        columns = value == '1' ? 1 : 2;
       case 'language':
         language = value;
       case 'glass':
@@ -81,13 +85,22 @@ class Settings extends StatelessWidget {
         ),
       );
       return Scaffold(
-        appBar: AppBar(title: Text(context.zh('设置', '設定'))),
+        appBar: AppBar(
+          automaticallyImplyLeading: false,
+          title: Text(context.zh('设置', '設定')),
+        ),
         body: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 720),
             child: ListView(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.fromLTRB(24, 24, 24, 108),
               children: [
+                group(
+                  context.zh('剧场布局', '劇場佈局'),
+                  'columns',
+                  '${preferences.columns}',
+                  {'1': '一列', '2': context.zh('两列', '兩列')},
+                ),
                 group(
                   context.zh('界面语言', '介面語言'),
                   'language',
@@ -115,8 +128,8 @@ class Settings extends StatelessWidget {
                   {
                     'solid': context.zh('原色', '原色'),
                     'blur': context.zh('高斯模糊', '高斯模糊'),
-                    'liquid': context.zh('流动玻璃', '流動玻璃'),
-                    'aero': context.zh('极光玻璃', '極光玻璃'),
+                    'liquid': 'Liquid Glass',
+                    'aero': 'Aero Glass',
                   },
                 ),
               ],

@@ -1,10 +1,17 @@
 import 'package:material_ui/material_ui.dart';
 
 import 'design.dart';
-import 'download_queue.dart';
+import 'download_web_queue.dart' if (dart.library.io) 'download_queue.dart';
+import 'download_status.dart';
 import 'src/rust/api/library.dart';
 
 final _downloads = DownloadQueue();
+
+Widget downloadsPage(List<Drama> catalog, void Function(Drama, Episode) play) =>
+    Padding(
+      padding: const EdgeInsets.only(bottom: 90),
+      child: _DownloadSheet(catalog, null, null, play: play),
+    );
 
 Future<String?> offlinePath(Episode episode) async {
   try {
@@ -14,9 +21,11 @@ Future<String?> offlinePath(Episode episode) async {
   }
 }
 
+void releaseOfflinePath(String? path) => _downloads.releasePath(path);
+
 Widget downloadButton(List<Drama> catalog, {Drama? drama, Episode? episode}) =>
     Builder(
-      builder: (context) => IconButton(
+      builder: (context) => IconButton.filledTonal(
         tooltip: context.zh('离线下载', '離線下載'),
         icon: const Icon(Icons.download_outlined),
         onPressed: () => showModalBottomSheet<void>(
@@ -29,7 +38,8 @@ Widget downloadButton(List<Drama> catalog, {Drama? drama, Episode? episode}) =>
     );
 
 class _DownloadSheet extends StatefulWidget {
-  const _DownloadSheet(this.catalog, this.drama, this.episode);
+  const _DownloadSheet(this.catalog, this.drama, this.episode, {this.play});
+  final void Function(Drama, Episode)? play;
   final List<Drama> catalog;
   final Drama? drama;
   final Episode? episode;
@@ -46,16 +56,23 @@ class _DownloadSheetState extends State<_DownloadSheet> {
       final jobs = _downloads.jobs.values.toList();
       final episode = widget.episode;
       final drama = widget.drama;
+      final canResume =
+          _downloads.paused || jobs.any((j) => j.state == DownloadState.paused);
       return Column(
         children: [
           ListTile(
             title: Text(context.zh('离线下载', '離線下載')),
-            trailing: jobs.isEmpty
+            trailing:
+                jobs.every(
+                  (j) =>
+                      j.state == DownloadState.saved ||
+                      j.state == DownloadState.failed,
+                )
                 ? null
                 : TextButton(
-                    onPressed: () => _downloads.setPaused(!_downloads.paused),
+                    onPressed: () => _downloads.setPaused(!canResume),
                     child: Text(
-                      _downloads.paused
+                      canResume
                           ? context.zh('全部继续', '全部繼續')
                           : context.zh('全部暂停', '全部暫停'),
                     ),
@@ -108,6 +125,18 @@ class _DownloadSheetState extends State<_DownloadSheet> {
                         '${context.zh('下载失败', '下載失敗')} · ${job.error}',
                     };
                     return ListTile(
+                      onTap:
+                          job.state == DownloadState.saved &&
+                              widget.play != null
+                          ? () {
+                              final drama = widget.catalog.firstWhere(
+                                (d) => d.episodes.any(
+                                  (e) => e.sha256 == job.episode.sha256,
+                                ),
+                              );
+                              widget.play!(drama, job.episode);
+                            }
+                          : null,
                       title: Text('${job.title} · ${job.episode.title}'),
                       subtitle: Text(label),
                       trailing: job.state == DownloadState.failed

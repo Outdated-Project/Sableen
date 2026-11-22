@@ -36,7 +36,7 @@ ThemeData theaterTheme(
   final generated = ColorScheme.fromSeed(
     seedColor: system?.primary ?? const Color(0xff944663),
     brightness: brightness,
-    dynamicSchemeVariant: DynamicSchemeVariant.expressive,
+    dynamicSchemeVariant: DynamicSchemeVariant.fidelity,
   );
   var scheme = mode == Palette.dynamic ? system ?? generated : generated;
   if (mode == Palette.amoled && brightness == Brightness.dark) {
@@ -71,28 +71,6 @@ ThemeData theaterTheme(
       ),
     ),
   );
-}
-
-class ShapeMark extends StatelessWidget {
-  const ShapeMark(this.shape, this.icon, {super.key, this.size = 64});
-  final RoundedPolygon shape;
-  final IconData icon;
-  final double size;
-  @override
-  Widget build(BuildContext context) {
-    final c = Theme.of(context).colorScheme;
-    return AnimatedContainer(
-      duration: motion(context),
-      curve: fluidCurve,
-      width: size,
-      height: size,
-      decoration: ShapeDecoration(
-        color: c.primaryContainer,
-        shape: MaterialShapeBorder(shape: shape),
-      ),
-      child: Icon(icon, size: size * .43, color: c.onPrimaryContainer),
-    );
-  }
 }
 
 class Capsule extends StatefulWidget {
@@ -152,64 +130,171 @@ class _CapsuleState extends State<Capsule> {
   Widget build(BuildContext context) {
     final c = Theme.of(context).colorScheme;
     final style = widget.mode;
-    final names = [
-      context.zh('剧场', '劇場'),
-      context.zh('猜你喜欢', '猜你喜歡'),
-      context.zh('历史', '歷史'),
+    final destinations = [
+      (context.zh('剧场', '劇場'), Icons.movie_outlined, Icons.movie_rounded),
+      (
+        context.zh('历史纪录', '歷史紀錄'),
+        Icons.history_outlined,
+        Icons.history_rounded,
+      ),
+      (
+        context.zh('下载', '下載'),
+        Icons.file_download_outlined,
+        Icons.file_download_rounded,
+      ),
+      (context.zh('设置', '設定'), Icons.settings_outlined, Icons.settings_rounded),
     ];
-    Widget bar = DecoratedBox(
+    final solid = style == Glass.solid || MediaQuery.highContrastOf(context);
+    final liquid = style == Glass.liquid;
+    final aero = style == Glass.aero;
+    final rim = BorderRadius.circular(28);
+    final dark = c.brightness == Brightness.dark;
+    final selected = solid
+        ? c.primary
+        : Color.lerp(c.surfaceContainerHigh, c.primary, dark ? .30 : .38)!;
+    final foreground = solid ? c.onPrimary : c.onSurface;
+    final indicator = DecoratedBox(
       decoration: BoxDecoration(
-        color: style == Glass.aero
-            ? null
-            : c.surfaceContainerHigh.withValues(
-                alpha: style == Glass.solid ? 1 : .73,
-              ),
-        gradient: style == Glass.aero
-            ? LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  c.surface.withValues(alpha: .94),
-                  c.primaryContainer.withValues(alpha: .80),
-                  c.secondaryContainer.withValues(alpha: .62),
-                  c.surface.withValues(alpha: .86),
-                ],
-                stops: const [0, .49, .51, 1],
-              )
+        borderRadius: rim,
+        color: solid || style == Glass.blur
+            ? selected.withValues(alpha: solid ? 1 : .88)
             : null,
-        borderRadius: BorderRadius.circular(100),
-        border: Border.all(color: c.outlineVariant),
+        gradient: solid || style == Glass.blur
+            ? null
+            : LinearGradient(
+                begin: liquid ? Alignment.topLeft : Alignment.topCenter,
+                end: liquid ? Alignment.bottomRight : Alignment.bottomCenter,
+                stops: liquid ? const [0, .22, .8, 1] : const [0, .27, .72, 1],
+                colors: [
+                  Color.lerp(
+                    selected,
+                    Colors.white,
+                    dark ? .12 : (liquid ? .56 : .28),
+                  )!.withValues(alpha: .9),
+                  selected.withValues(alpha: liquid ? .47 : .73),
+                  selected.withValues(alpha: liquid ? .60 : .90),
+                  Color.lerp(selected, c.surface, .45)!.withValues(alpha: .83),
+                ],
+              ),
+        border: solid
+            ? null
+            : Border.all(
+                color: c.onSurface.withValues(alpha: liquid ? .22 : .14),
+              ),
+      ),
+    );
+    final bar = NavigationBarTheme(
+      data: NavigationBarThemeData(
+        labelTextStyle: WidgetStateProperty.resolveWith(
+          (states) => TextStyle(
+            fontSize: 12,
+            fontWeight: states.contains(WidgetState.selected)
+                ? FontWeight.w700
+                : FontWeight.w500,
+            color: states.contains(WidgetState.selected)
+                ? foreground
+                : c.onSurface,
+          ),
+        ),
+        iconTheme: WidgetStateProperty.resolveWith(
+          (states) => IconThemeData(
+            size: 22,
+            color: states.contains(WidgetState.selected)
+                ? foreground
+                : c.onSurfaceVariant,
+          ),
+        ),
       ),
       child: NavigationBar(
-        height: 68,
+        height: 62,
         selectedIndex: widget.index,
         onDestinationSelected: widget.select,
         animationDuration: motion(context),
         backgroundColor: Colors.transparent,
         elevation: 0,
         indicatorShape: const StadiumBorder(),
+        indicatorColor: Colors.transparent,
         destinations: [
-          for (final (i, icon) in [
-            Icons.movie_filter_rounded,
-            Icons.auto_awesome_rounded,
-            Icons.history_rounded,
-          ].indexed)
-            NavigationDestination(icon: Icon(icon), label: names[i]),
+          for (final (label, icon, filled) in destinations)
+            NavigationDestination(
+              icon: Icon(icon),
+              selectedIcon: Icon(filled),
+              label: label,
+            ),
         ],
       ),
     );
-    if (style != Glass.solid) {
-      final filter = style == Glass.liquid && shader != null
-          ? ui.ImageFilter.shader(shader!)
-          : ui.ImageFilter.blur(
-              sigmaX: style == Glass.aero ? 14 : 9,
-              sigmaY: style == Glass.aero ? 14 : 9,
-            );
-      bar = BackdropFilter(filter: filter, child: bar);
+    Widget base = ColoredBox(
+      color: c.surfaceContainerHigh.withValues(
+        alpha: solid
+            ? 1
+            : aero
+            ? .76
+            : .82,
+      ),
+    );
+    if (!solid) {
+      base = BackdropFilter(
+        filter: ui.ImageFilter.blur(
+          sigmaX: aero ? 12 : 7,
+          sigmaY: aero ? 12 : 7,
+        ),
+        child: base,
+      );
     }
-    return Material(
-      type: MaterialType.transparency,
-      child: ClipRRect(borderRadius: BorderRadius.circular(100), child: bar),
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: rim,
+        boxShadow: [
+          BoxShadow(
+            color: c.shadow.withValues(alpha: .12),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        type: MaterialType.transparency,
+        child: ClipRRect(
+          borderRadius: rim,
+          child: Stack(
+            children: [
+              Positioned.fill(child: base),
+              Padding(
+                padding: const EdgeInsets.all(4),
+                child: Stack(
+                  children: [
+                    Positioned.fill(
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: FractionallySizedBox(
+                          widthFactor: 1 / destinations.length,
+                          heightFactor: 1,
+                          child: AnimatedSlide(
+                            duration: motion(context),
+                            curve: fluidCurve,
+                            offset: Offset(widget.index.toDouble(), 0),
+                            child: ClipRRect(
+                              borderRadius: rim,
+                              child: liquid && !solid && shader != null
+                                  ? BackdropFilter(
+                                      filter: ui.ImageFilter.shader(shader!),
+                                      child: indicator,
+                                    )
+                                  : indicator,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    bar,
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

@@ -93,7 +93,12 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with: {persist-credentials: false}
       - run: sudo apt-get update && sudo apt-get install -y ffmpeg
-      - run: python3 tool/ci/check_streams.py --require-episodes
+      - run: python3 tool/ci/check_streams.py --require-episodes --report source-measurements.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: ${{ !cancelled() && hashFiles('source-measurements.json') != '' }}
+        with:
+          name: source-measurements
+          path: source-measurements.json
 
   linux:
     needs: quality
@@ -223,6 +228,7 @@ jobs:
           flutter build web --release --no-web-resources-cdn
           cmp web/pkg/rust_lib_sableen_bg.wasm build/web/pkg/rust_lib_sableen_bg.wasm
           python3 tool/ci/verify_assets.py build/web/assets
+          python3 tool/stage_web_media.py build/web
       - name: Test the distribution archive in Chrome
         run: |
           mkdir dist

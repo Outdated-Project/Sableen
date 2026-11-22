@@ -3,12 +3,13 @@ import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
+import 'package:media_kit/media_kit.dart' show Media;
 import 'package:native_proxy_resolver/native_proxy_resolver.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'src/rust/api/library.dart';
-
-enum DownloadState { queued, fetching, verifying, saved, paused, failed }
+import 'download_status.dart';
+export 'download_status.dart';
 
 class EpisodeDownload {
   EpisodeDownload(this.title, this.episode);
@@ -98,6 +99,8 @@ class DownloadQueue extends ChangeNotifier {
     }
   }
 
+  void releasePath(String? path) {}
+
   static Future<bool> _matchesHash((File, String) input) async =>
       (await sha256.bind(input.$1.openRead()).first).toString() == input.$2;
 
@@ -106,25 +109,39 @@ class DownloadQueue extends ChangeNotifier {
     final byHash = {
       for (final drama in catalog)
         for (final e in drama.episodes)
-          if (e.sha256 != null) '${e.sha256}.mp4': (drama.title, e),
+          if (e.sha256 != null) e.sha256!: (drama.title, e),
     };
     final found = <String>{};
     final files = await root.exists()
         ? root.list(followLinks: false)
         : const Stream<FileSystemEntity>.empty();
     await for (final file in files) {
-      final item = byHash[file.uri.pathSegments.last];
-      if (item == null || file is! File || await localPath(item.$2) == null) {
-        continue;
-      }
+      final name = file.uri.pathSegments.where((s) => s.isNotEmpty).last;
+      final item = byHash[name.split('.').first];
+      if (item == null) continue;
       final (title, episode) = item;
-      found.add(episode.sha256!);
-      jobs.putIfAbsent(
-        episode.sha256!,
-        () => EpisodeDownload(title, episode)
-          ..state = DownloadState.saved
-          ..received = episode.bytes!,
-      );
+      final hash = episode.sha256!;
+      if (file is Directory && name == '$hash.parts') {
+        jobs.putIfAbsent(
+          hash,
+          () => EpisodeDownload(title, episode)
+            ..state = DownloadState.paused
+            ..parts = file,
+        );
+      } else if (file is File &&
+          name == '$hash.mp4' &&
+          await localPath(episode) != null) {
+        found.add(hash);
+        final job = jobs.putIfAbsent(
+          hash,
+          () => EpisodeDownload(title, episode),
+        );
+        if (!job.busy) {
+          job.state = DownloadState.saved;
+          job.received = episode.bytes!;
+          _waiting.remove(job);
+        }
+      }
     }
     // Recheck any earlier entries if the OS or the user removed a saved file.
     for (final job in jobs.values.toList()) {
@@ -151,12 +168,19 @@ class DownloadQueue extends ChangeNotifier {
     job.busy = true;
     job.removing = true;
     try {
-      if (job.state == DownloadState.saved) {
-        final file = await _target(job.episode);
-        if (await file.exists()) await file.delete();
+      final file = await _target(job.episode);
+      final lock = await _lock(file);
+      try {
+        if (job.state == DownloadState.saved && await file.exists()) {
+          await file.delete();
+        }
+        if (job.parts != null && await job.parts!.exists()) {
+          await job.parts!.delete(recursive: true);
+        }
+        jobs.remove(job.episode.sha256);
+      } finally {
+        await lock.close();
       }
-      if (job.parts != null) await _cleanup(job.parts!);
-      jobs.remove(job.episode.sha256);
     } finally {
       job.busy = false;
       job.removing = false;
@@ -182,7 +206,6 @@ class DownloadQueue extends ChangeNotifier {
   }
 
   void setPaused(bool value) {
-    if (value == paused) return;
     paused = value;
     for (final job in jobs.values) {
       if (job.removing) continue;
@@ -195,6 +218,7 @@ class DownloadQueue extends ChangeNotifier {
         if (!_waiting.contains(job)) _waiting.add(job);
       } else if (!value && job.state == DownloadState.paused) {
         job.state = DownloadState.queued;
+        if (!_waiting.contains(job)) _waiting.add(job);
       }
     }
     _pump();
@@ -224,14 +248,32 @@ class DownloadQueue extends ChangeNotifier {
     if (job.generation != generation) throw const HttpException('Paused');
   }
 
+  Future<RandomAccessFile> _lock(File target) async {
+    await target.parent.create(recursive: true);
+    final handle = await File('${target.path}.lock')
+        .open(mode: FileMode.append);
+    try {
+      return await handle.lock(FileLock.exclusive);
+    } catch (_) {
+      await handle.close();
+      rethrow;
+    }
+  }
+
   Future<void> _run(EpisodeDownload job, int generation) async {
     var transferSlot = true;
+    RandomAccessFile? lock;
     final episode = job.episode;
     try {
       final target = await _target(episode);
+      lock = await _lock(target);
+      _active(job, generation);
       if (await localPath(episode) == null) {
-        await target.parent.create(recursive: true);
-        job.parts ??= await target.parent.createTemp('episode-');
+        job.parts = await Directory(
+          '${target.parent.path}/${episode.sha256}.parts',
+        ).create();
+        job.single = await File('${job.parts!.path}/0-${episode.bytes}.part')
+            .exists();
         final files = await _transfer(job, generation);
         _active(job, generation);
         transferSlot = false;
@@ -258,6 +300,10 @@ class DownloadQueue extends ChangeNotifier {
       _waiting.remove(job);
       job.received = episode.bytes!;
     } catch (e) {
+      if (e is FormatException && lock != null && job.parts != null) {
+        await _cleanup(job.parts!);
+        job.parts = null;
+      }
       if (job.generation == generation) {
         job.state = DownloadState.failed;
         job.error = e is FileSystemException
@@ -268,12 +314,12 @@ class DownloadQueue extends ChangeNotifier {
       job.client?.close(force: true);
       job.client = null;
       if (transferSlot) _fetching--;
-      if (job.state == DownloadState.failed ||
-          job.state == DownloadState.saved) {
+      if (lock != null && job.state == DownloadState.saved) {
         final work = job.parts;
         job.parts = null;
-        if (work != null) unawaited(_cleanup(work));
+        if (work != null) await _cleanup(work);
       }
+      await lock?.close();
       job.busy = false;
       _pump();
       _changed();
@@ -281,6 +327,13 @@ class DownloadQueue extends ChangeNotifier {
   }
 
   Future<List<File>> _transfer(EpisodeDownload job, int generation) async {
+    if (job.episode.url.startsWith('asset:///assets/renditions/')) {
+      final asset = File(Media.normalizeURI(job.episode.url));
+      if (await asset.length() != job.episode.bytes) {
+        throw const FormatException('Asset size');
+      }
+      return [await asset.copy('${job.parts!.path}/rendition.mp4')];
+    }
     final urls = [job.episode.url, ...?job.episode.mirrors];
     for (var i = 0; i < urls.length; i++) {
       _active(job, generation);
@@ -348,6 +401,7 @@ class DownloadQueue extends ChangeNotifier {
     final file = File('${job.parts!.path}/$start-$end.part');
     var count = await file.exists() ? await file.length() : 0;
     final length = end - start;
+    if (count > length) throw const FormatException('Invalid partial length');
     job.received += count;
     const timeout = Duration(seconds: 15);
     for (var attempt = 0; count < length; attempt++) {

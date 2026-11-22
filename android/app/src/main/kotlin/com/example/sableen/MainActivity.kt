@@ -26,15 +26,6 @@ class MainActivity : FlutterActivity() {
                 result.success(null)
             } else when (call.method) {
                 "supportsPip" -> result.success(supportsPip())
-                "openXifan" -> {
-                    val intent = packageManager.getLaunchIntentForPackage("com.xifan.drama")
-                    val opened = try {
-                        if (intent != null) startActivity(intent)
-                        intent != null
-                    } catch (_: android.content.ActivityNotFoundException) { false }
-                    catch (_: SecurityException) { false }
-                    result.success(opened)
-                }
                 "isPip" -> result.success(Build.VERSION.SDK_INT >= 24 && isInPictureInPictureMode)
                 "enterPip" -> {
                     val aspect = (call.arguments as? Number)?.toDouble() ?: 1.0

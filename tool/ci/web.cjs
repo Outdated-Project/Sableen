@@ -29,11 +29,13 @@ async function test() {
     page.on('response', res => { if (res.status() >= 400) console.error('HTTP', res.status(), new URL(res.url()).hostname); });
     await page.goto(`http://127.0.0.1:${server.address().port}`);
     await page.locator('flt-semantics-placeholder').dispatchEvent('click');
+    const renditions = JSON.parse(fs.readFileSync(path.join(root, 'assets/assets/renditions/index.json'), 'utf8'));
     const titles = [['红果短剧', 'hongguo'], ['红果漫剧', 'comic']].map(([label, file]) => {
       const drama = JSON.parse(fs.readFileSync(path.join(root, 'assets/assets/catalogs', file + '.json'), 'utf8')).dramas[0];
-      return [label, drama.title, drama.episodes[0].page];
+      return [label, drama.title, drama.episodes[0]];
     });
-    for (const [publisher, title, officialPage] of titles) {
+    for (const [, title] of titles) await page.getByRole('button', { name: new RegExp(title) }).first().waitFor();
+    for (const [publisher, title, episode] of titles) {
       console.log('Testing', publisher, title);
       await page.getByRole('checkbox', { name: publisher }).press('Space');
       await page.getByRole('button', { name: new RegExp(title) }).first().press('Enter');
@@ -58,23 +60,34 @@ async function test() {
         await page.waitForFunction(() => { const v = document.querySelector('video'); return v?.currentTime >= v?.duration * .45; }, null, { timeout: 4500 });
       }
       await page.mouse.move(70, 70);
-      const [official] = await Promise.all([
-        page.context().waitForEvent('page'),
-        page.getByRole('button', { name: '红果官网观看' }).press('Enter'),
-      ]);
-      try {
-        await official.waitForURL(officialPage, { waitUntil: 'commit' });
-        await page.waitForFunction(() => document.querySelector('video')?.paused);
-      } finally {
-        await official.close();
-      }
+      await page.getByRole('button', { name: '离线下载' }).first().press('Enter');
+      await page.getByRole('button', { name: `下载 ${episode.title}`, exact: true }).press('Enter');
+      await page.getByRole('group', { name: `${title} · ${episode.title} 已保存`, exact: true }).waitFor();
+      await page.waitForFunction(async hash => {
+        const cache = await caches.open('sableen-episodes-v1');
+        return !!(await cache.match(new URL(`media/${hash}.mp4`, document.baseURI)));
+      }, renditions[episode.sha256]?.sha256 ?? episode.sha256);
+      await page.keyboard.press('Escape');
+      await page.mouse.move(100, 70);
+      assert.equal(page.context().pages().length, 1);
       await page.getByRole('button', { name: '返回', exact: true }).first().evaluate(el => el.click());
-      await page.getByRole('tab', { name: '历史' }).waitFor();
+      await page.getByRole('tab', { name: '历史纪录' }).waitFor();
     }
     await page.reload();
     await page.locator('flt-semantics-placeholder').dispatchEvent('click');
-    await page.getByRole('tab', { name: '历史' }).click();
+    await page.getByRole('tab', { name: '历史纪录' }).press('Enter');
     for (const [, title] of titles) await page.getByRole('button', { name: new RegExp(title) }).first().waitFor();
+    await page.getByRole('tab', { name: '下载' }).press('Enter');
+    await page.context().setOffline(true);
+    for (const [, title] of titles) {
+      await page.getByRole('button', { name: new RegExp(title) }).first().press('Enter');
+      await page.waitForFunction(() => {
+        const v = document.querySelector('video');
+        return v?.currentSrc.startsWith('blob:') && v.videoWidth > 0 && v.currentTime > .5;
+      });
+      await page.mouse.move(80, 60);
+      await page.getByRole('button', { name: '返回', exact: true }).first().evaluate(el => el.click());
+    }
     assert.deepEqual(errors, []);
   } finally {
     await browser.close();

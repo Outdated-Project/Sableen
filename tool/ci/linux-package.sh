@@ -3,6 +3,7 @@ set -euo pipefail
 root=$(mktemp -d)
 install -d "$root/DEBIAN" "$root/opt/sableen" "$root/usr/bin" "$root/usr/share/applications"
 cp -a build/linux/x64/release/bundle/. "$root/opt/sableen/"
+install -Dm644 assets/brand/sableen.svg "$root/usr/share/icons/hicolor/scalable/apps/sableen.svg"
 ln -s /opt/sableen/sableen "$root/usr/bin/sableen"
 cat > "$root/DEBIAN/control" <<EOF
 Package: sableen
@@ -17,6 +18,7 @@ cat > "$root/usr/share/applications/sableen.desktop" <<'EOF'
 Type=Application
 Name=Sableen
 Exec=/usr/bin/sableen
+Icon=sableen
 Categories=AudioVideo;Player;
 EOF
 mkdir -p dist

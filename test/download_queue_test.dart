@@ -85,13 +85,36 @@ void main() {
     expect(ranges.length, greaterThan(2));
     final saved = File((await queue.localPath(episode))!);
     expect(await sha256.bind(saved.openRead()).first, sha256.convert(data));
-    final restarted = DownloadQueue(directory: () async => root);
+    final restarted = DownloadQueue(
+      directory: () async => root,
+      route: (_) async => 'DIRECT',
+    );
     await restarted.restore([
       Drama(id: 'series', title: 'title', tags: [], episodes: [episode]),
     ]);
     expect(restarted.jobs[hash]!.state, DownloadState.saved);
     await restarted.remove(restarted.jobs[hash]!);
     expect(await queue.localPath(episode), isNull);
+    // Simulate the on-disk ranges left by a terminated process.
+    final partial = await Directory('${root.path}/episodes/$hash.parts')
+        .create();
+    await File('${partial.path}/0-600000.part')
+        .writeAsBytes(data.sublist(0, 40000));
+    await File('${partial.path}/600000-1200000.part')
+        .writeAsBytes(data.sublist(600000));
+    ranges.clear();
+    await restarted.restore([
+      Drama(id: 'series', title: 'title', tags: [], episodes: [episode]),
+    ]);
+    expect(restarted.jobs[hash]!.state, DownloadState.paused);
+    restarted.setPaused(false);
+    await until(
+      () =>
+          restarted.jobs[hash]!.state == DownloadState.saved &&
+          !restarted.jobs[hash]!.busy,
+    );
+    expect(ranges, ['bytes=40000-599999']);
+    expect(await restarted.localPath(episode), isNotNull);
   });
 
   test(

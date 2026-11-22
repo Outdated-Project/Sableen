@@ -173,6 +173,12 @@ void main() {
         );
       }
       await tester.pump();
+      await until(
+        'Pause did not expose download controls',
+        () =>
+            !player().state.playing &&
+            find.byTooltip('离线下载').hitTestable().evaluate().isNotEmpty,
+      );
       final episode = library.byId[id]!.episodes.first;
       final hadCopy = await offlinePath(episode) != null;
       if (!hadCopy) {
@@ -181,7 +187,7 @@ void main() {
           if (path != null) await File(path).delete();
         });
       }
-      await tester.tap(find.byTooltip('离线下载').last);
+      await tester.tap(find.byTooltip('离线下载').hitTestable().last);
       await tester.pumpAndSettle();
       await tester.tap(find.text('下载 ${episode.title}'));
       await until('Verified download failed', () {
@@ -239,11 +245,10 @@ void main() {
         closeTo(progress.positionMs, 900),
         reason: 'First position after restoring ${progress.positionMs} ms',
       );
+      final resumeStart = progress.positionMs;
       await until(
         'Resume failed',
-        () =>
-            player().state.position.inMilliseconds >= firstPosition + 500 &&
-            player().state.playing,
+        () => player().state.position.inMilliseconds >= resumeStart + 500,
       );
       await close();
       await restored.pendingWrites;

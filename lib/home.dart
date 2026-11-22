@@ -5,12 +5,15 @@ import 'package:flutter/rendering.dart' show ScrollCacheExtent;
 import 'package:material_ui/material_ui.dart';
 
 import 'design.dart';
+import 'drama_shelf.dart';
 import 'library.dart';
 import 'offline.dart';
 import 'playback.dart';
 import 'playback_window.dart';
 import 'preferences.dart';
 import 'src/rust/api/library.dart';
+
+enum _Filter { all, recommended, live, comic }
 
 class Home extends StatefulWidget {
   const Home({super.key, required this.library, required this.preferences});
@@ -22,25 +25,12 @@ class Home extends StatefulWidget {
 
 class _HomeState extends State<Home> {
   int tab = 0;
-  String query = '';
-  Publisher? publisher;
+  _Filter filter = _Filter.all;
   final search = TextEditingController();
-  late Future<List<Drama>> ranked;
-  static final _noChanges = Listenable.merge(const []);
-  Library get library => widget.library;
+  String query = '';
+  Future<List<Drama>>? ranked;
   bool enteringTheater = false;
-  @override
-  void initState() {
-    super.initState();
-    ranked = Future.value([]);
-  }
-
-  void _select(int value) {
-    setState(() {
-      tab = value;
-      if (tab == 1) ranked = library.ranked();
-    });
-  }
+  Library get library => widget.library;
 
   @override
   void dispose() {
@@ -48,48 +38,66 @@ class _HomeState extends State<Home> {
     super.dispose();
   }
 
-  Future<void> _watch(Drama d) async {
+  void _setFilter(_Filter value) => setState(() {
+    filter = value;
+    if (value == _Filter.recommended) ranked = library.ranked();
+  });
+
+  Future<void> _watch(
+    Drama drama,
+    ImageProvider? poster, [
+    Episode? selected,
+  ]) async {
     if (enteringTheater) return;
-    final last = library.latest(d.id);
-    var i = d.episodes.indexWhere((e) => e.id == last?.episode);
-    if (i < 0) {
-      i = 0;
-    } else if (last!.completed && i + 1 < d.episodes.length) {
-      i++;
-    }
-    final fullscreen = setTheaterFullscreen(true);
-    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.macOS) {
-      enteringTheater = true;
-      try {
+    enteringTheater = true;
+    try {
+      final last = library.latest(drama.id);
+      var episode = drama.episodes.indexWhere(
+        (e) => e.id == (selected?.id ?? last?.episode),
+      );
+      if (episode < 0) {
+        episode = 0;
+      } else if (selected == null &&
+          last!.completed &&
+          episode + 1 < drama.episodes.length) {
+        episode++;
+      }
+      final fullscreen = setTheaterFullscreen(true);
+      if (!kIsWeb) {
         await fullscreen;
-      } finally {
-        enteringTheater = false;
+      } else {
+        unawaited(fullscreen);
       }
       if (!mounted) return;
-    } else {
-      unawaited(fullscreen);
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => Theater(
+            library: library,
+            drama: drama,
+            initial: episode,
+            poster: poster,
+          ),
+        ),
+      );
+    } finally {
+      await setTheaterFullscreen(false);
+      enteringTheater = false;
     }
-    await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => Theater(library: library, drama: d, initial: i),
-      ),
-    );
-    await setTheaterFullscreen(false);
-    if (mounted && tab == 1) _select(1);
+    if (mounted && filter == _Filter.recommended) _setFilter(filter);
   }
 
   Future<void> _clear() async {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(ctx.zh('清空本剧单的观看历史？', '清空此劇單的觀看歷史？')),
+        title: Text(ctx.zh('清空观看历史？', '清空觀看歷史？')),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
             child: Text(ctx.zh('取消', '取消')),
           ),
-          ElevatedButton(
+          FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
             child: Text(ctx.zh('清空', '清空')),
           ),
@@ -99,36 +107,174 @@ class _HomeState extends State<Home> {
     if (ok == true) await library.clearHistory();
   }
 
+  List<Drama> _results(Iterable<Drama> titles) => titles
+      .where((d) {
+        final origin = library.publishers[d.id];
+        if (filter == _Filter.live && origin != Publisher.hongguo ||
+            filter == _Filter.comic && origin != Publisher.comic) {
+          return false;
+        }
+        return query.isEmpty ||
+            d.title.contains(query) ||
+            d.tags.any((tag) => tag.contains(query));
+      })
+      .toList(growable: false);
+
+  Widget _catalog(BuildContext context, {required bool history}) {
+    final seen = <String>{};
+    final insets = MediaQuery.sizeOf(context).width >= 760 ? 36.0 : 16.0;
+    Widget shelf(List<Drama> items) => DramaShelf(
+      library: library,
+      columns: widget.preferences.columns,
+      titles: items,
+      history: history,
+      onOpen: _watch,
+      emptyText: history
+          ? context.zh('还没有观看记录', '還沒有觀看紀錄')
+          : context.zh('没有匹配的剧目', '沒有符合的劇目'),
+    );
+    final labels = [
+      '全部',
+      context.zh('猜你喜欢', '猜你喜歡'),
+      context.zh('红果短剧', '紅果短劇'),
+      context.zh('红果漫剧', '紅果漫劇'),
+    ];
+    return CustomScrollView(
+      key: PageStorageKey(history ? 'history' : 'catalog'),
+      scrollCacheExtent: const ScrollCacheExtent.pixels(150),
+      slivers: [
+        SliverPadding(
+          padding: EdgeInsets.fromLTRB(insets, 20, insets, 18),
+          sliver: SliverToBoxAdapter(
+            child: Row(
+              children: [
+                if (!history) ...[
+                  Image.asset(
+                    'assets/brand/sableen.png',
+                    width: 38,
+                    height: 38,
+                    cacheWidth: 96,
+                    excludeFromSemantics: true,
+                  ),
+                  const SizedBox(width: 12),
+                ],
+                Expanded(
+                  child: Text(
+                    history
+                        ? context.zh('历史纪录', '歷史紀錄')
+                        : context.zh('剧场', '劇場'),
+                    style: Theme.of(context).textTheme.headlineMedium
+                        ?.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                ),
+                if (history &&
+                    (library.history.isNotEmpty || library.historyDamaged))
+                  IconButton(
+                    tooltip: context.zh('清空历史', '清空歷史'),
+                    onPressed: _clear,
+                    icon: const Icon(Icons.delete_outline),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        if (history && (library.historyDamaged || library.writeFailed))
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.all(insets),
+              child: Text(
+                library.historyDamaged
+                    ? context.zh('记录无法读取，清空历史后可重新记录。', '紀錄無法讀取，清空歷史後可重新記錄。')
+                    : context.zh('记录未能保存到设备。', '紀錄未能儲存到裝置。'),
+              ),
+            ),
+          ),
+        if (!history)
+          SliverPadding(
+            padding: EdgeInsets.symmetric(horizontal: insets),
+            sliver: SliverToBoxAdapter(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextField(
+                    controller: search,
+                    decoration: InputDecoration(
+                      prefixIcon: const Icon(Icons.search_rounded),
+                      hintText: context.zh('搜索剧名或题材', '搜尋劇名或題材'),
+                    ),
+                    onChanged: (s) => setState(() => query = s.trim()),
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 5,
+                    runSpacing: 2,
+                    children: [
+                      for (final item in _Filter.values)
+                        ChoiceChip(
+                          shape: const StadiumBorder(),
+                          label: Text(labels[item.index]),
+                          showCheckmark: false,
+                          padding: const EdgeInsets.symmetric(horizontal: 3),
+                          labelPadding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                          ),
+                          selected: filter == item,
+                          onSelected: (_) => _setFilter(item),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                ],
+              ),
+            ),
+          ),
+        SliverPadding(
+          padding: EdgeInsets.fromLTRB(insets, 0, insets, 110),
+          sliver: history
+              ? shelf([
+                  for (final p in library.history)
+                    if (seen.add(p.drama)) ?library.byId[p.drama],
+                ])
+              : filter == _Filter.recommended
+              ? FutureBuilder<List<Drama>>(
+                  future: ranked,
+                  builder: (context, snapshot) {
+                    if (snapshot.hasError) {
+                      return SliverToBoxAdapter(
+                        child: Center(
+                          child: TextButton(
+                            onPressed: () => _setFilter(filter),
+                            child: Text(context.zh('重试推荐', '重試推薦')),
+                          ),
+                        ),
+                      );
+                    }
+                    if (!snapshot.hasData) {
+                      return const SliverToBoxAdapter(
+                        child: Center(child: CircularProgressIndicator()),
+                      );
+                    }
+                    return shelf(_results(snapshot.requireData));
+                  },
+                )
+              : shelf(_results(library.dramas)),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) => ListenableBuilder(
-    listenable: tab == 2 && TickerMode.valuesOf(context).enabled
-        ? library
-        : _noChanges,
+    listenable: widget.preferences,
     builder: (context, _) {
-      final names = [
-        context.zh('我的剧场', '我的劇場'),
-        context.zh('猜你喜欢', '猜你喜歡'),
-        context.zh('观看历史', '觀看歷史'),
-      ];
-      final known = <String>{};
-      final rows = switch (tab) {
-        0 =>
-          library.dramas
-              .where(
-                (d) =>
-                    (publisher == null ||
-                        library.publishers[d.id] == publisher) &&
-                    (query.isEmpty ||
-                        d.title.contains(query) ||
-                        d.tags.any((t) => t.contains(query))),
-              )
-              .toList(),
-        2 => [
-          for (final h in library.history)
-            if (known.add(h.drama) && library.byId[h.drama] != null)
-              library.byId[h.drama]!,
-        ],
-        _ => <Drama>[],
+      final page = switch (tab) {
+        0 => _catalog(context, history: false),
+        1 => ListenableBuilder(
+          listenable: library,
+          builder: (context, _) => _catalog(context, history: true),
+        ),
+        2 => downloadsPage(library.dramas, (d, e) => _watch(d, null, e)),
+        _ => Settings(widget.preferences),
       };
       return Scaffold(
         body: SafeArea(
@@ -137,235 +283,39 @@ class _HomeState extends State<Home> {
               Align(
                 alignment: Alignment.topCenter,
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 1440),
-                  child: LayoutBuilder(
-                    builder: (context, box) {
-                      final inset = box.maxWidth >= 840 ? 48.0 : 20.0;
-                      return TweenAnimationBuilder<double>(
-                        key: ValueKey(tab),
-                        duration: motion(context),
-                        curve: fluidCurve,
-                        tween: Tween(begin: 0, end: 1),
-                        builder: (context, progress, child) =>
-                            Transform.translate(
-                              offset: Offset(0, 12 * (1 - progress)),
-                              child: Opacity(opacity: progress, child: child),
-                            ),
-                        child: CustomScrollView(
-                          key: PageStorageKey(tab),
-                          scrollCacheExtent: const ScrollCacheExtent.pixels(
-                            160,
-                          ),
-                          slivers: [
-                            SliverPadding(
-                              padding: EdgeInsets.fromLTRB(
-                                inset,
-                                16,
-                                inset,
-                                12,
-                              ),
-                              sliver: SliverToBoxAdapter(
-                                child: Row(
-                                  children: [
-                                    ShapeMark(
-                                      MaterialShapes.cookie6Sided,
-                                      Icons.play_arrow_rounded,
-                                      size: 42,
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Expanded(
-                                      child: Text(
-                                        'Sableen',
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .titleLarge
-                                            ?.copyWith(
-                                              fontWeight: FontWeight.w700,
-                                            ),
-                                      ),
-                                    ),
-                                    downloadButton(library.dramas),
-                                    IconButton(
-                                      tooltip: context.zh('设置', '設定'),
-                                      onPressed: () => Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (_) =>
-                                              Settings(widget.preferences),
-                                        ),
-                                      ),
-                                      icon: const Icon(Icons.tune_rounded),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            SliverPadding(
-                              padding: EdgeInsets.fromLTRB(
-                                inset,
-                                24,
-                                inset,
-                                18,
-                              ),
-                              sliver: SliverToBoxAdapter(
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        names[tab],
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .displaySmall
-                                            ?.copyWith(
-                                              fontWeight: FontWeight.w700,
-                                            ),
-                                      ),
-                                    ),
-                                    if (tab == 2 &&
-                                        (library.history.isNotEmpty ||
-                                            library.historyDamaged))
-                                      IconButton(
-                                        tooltip: context.zh('清空历史', '清空歷史'),
-                                        onPressed: _clear,
-                                        icon: const Icon(
-                                          Icons.delete_outline_rounded,
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            if ((library.historyDamaged ||
-                                    library.writeFailed) &&
-                                tab == 2)
-                              SliverPadding(
-                                padding: EdgeInsets.all(inset),
-                                sliver: SliverToBoxAdapter(
-                                  child: Text(
-                                    library.historyDamaged
-                                        ? context.zh(
-                                            '记录无法读取。清空历史后可重新记录。',
-                                            '紀錄無法讀取。清空歷史後可重新記錄。',
-                                          )
-                                        : context.zh(
-                                            '记录未能保存到设备。',
-                                            '紀錄未能儲存到裝置。',
-                                          ),
-                                  ),
-                                ),
-                              ),
-                            if (tab == 0 && library.dramas.isNotEmpty)
-                              SliverPadding(
-                                padding: EdgeInsets.fromLTRB(
-                                  inset,
-                                  0,
-                                  inset,
-                                  20,
-                                ),
-                                sliver: SliverToBoxAdapter(
-                                  child: TextField(
-                                    controller: search,
-                                    decoration: InputDecoration(
-                                      prefixIcon: const Icon(
-                                        Icons.search_rounded,
-                                      ),
-                                      hintText: context.zh(
-                                        '搜索剧名或题材',
-                                        '搜尋劇名或題材',
-                                      ),
-                                    ),
-                                    onChanged: (s) =>
-                                        setState(() => query = s.trim()),
-                                  ),
-                                ),
-                              ),
-                            if (tab == 0)
-                              SliverPadding(
-                                padding: EdgeInsets.fromLTRB(
-                                  inset,
-                                  0,
-                                  inset,
-                                  16,
-                                ),
-                                sliver: SliverToBoxAdapter(
-                                  child: Wrap(
-                                    spacing: 8,
-                                    children: [
-                                      for (final (value, label)
-                                          in <(Publisher?, String)>[
-                                            (null, '全部'),
-                                            (
-                                              Publisher.hongguo,
-                                              context.zh('红果短剧', '紅果短劇'),
-                                            ),
-                                            (
-                                              Publisher.comic,
-                                              context.zh('红果漫剧', '紅果漫劇'),
-                                            ),
-                                          ])
-                                        ChoiceChip(
-                                          label: Text(label),
-                                          selected: publisher == value,
-                                          onSelected: (_) =>
-                                              setState(() => publisher = value),
-                                        ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            if (tab == 1)
-                              FutureBuilder<List<Drama>>(
-                                future: ranked,
-                                builder: (context, snapshot) {
-                                  if (snapshot.hasError) {
-                                    return SliverToBoxAdapter(
-                                      child: Center(
-                                        child: ElevatedButton(
-                                          onPressed: () => _select(1),
-                                          child: Text(
-                                            context.zh('重新推荐', '重新推薦'),
-                                          ),
-                                        ),
-                                      ),
-                                    );
-                                  }
-                                  if (!snapshot.hasData) {
-                                    return const SliverToBoxAdapter(
-                                      child: Center(
-                                        child: CircularProgressIndicator(),
-                                      ),
-                                    );
-                                  }
-                                  return _shelf(
-                                    context,
-                                    snapshot.data!,
-                                    inset,
-                                    box.maxWidth,
-                                  );
-                                },
-                              )
-                            else
-                              _shelf(context, rows, inset, box.maxWidth),
-                            const SliverToBoxAdapter(
-                              child: SizedBox(height: 110),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
+                  constraints: const BoxConstraints(maxWidth: 1060),
+                  child: TweenAnimationBuilder<double>(
+                    key: ValueKey(tab),
+                    tween: Tween(begin: 0, end: 1),
+                    duration: motion(context),
+                    curve: fluidCurve,
+                    builder: (context, t, child) => Transform.translate(
+                      offset: Offset(0, 10 * (1 - t)),
+                      child: Opacity(opacity: t, child: child),
+                    ),
+                    child: page,
                   ),
                 ),
               ),
               Align(
                 alignment: Alignment.bottomCenter,
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
                   child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 420),
+                    constraints: const BoxConstraints(maxWidth: 480),
                     child: Capsule(
                       mode: widget.preferences.glass,
                       index: tab,
-                      select: _select,
+                      select: (index) {
+                        if (tab == index) return;
+                        FocusManager.instance.primaryFocus?.unfocus();
+                        setState(() {
+                          tab = index;
+                          if (tab == 0 && filter == _Filter.recommended) {
+                            ranked = library.ranked();
+                          }
+                        });
+                      },
                     ),
                   ),
                 ),
@@ -376,150 +326,4 @@ class _HomeState extends State<Home> {
       );
     },
   );
-  Widget _shelf(
-    BuildContext context,
-    List<Drama> dramas,
-    double inset,
-    double width,
-  ) {
-    if (dramas.isEmpty) {
-      final text = switch (tab) {
-        0 => context.zh('没有匹配的剧目', '沒有符合的劇目'),
-        1 => context.zh('暂无可推荐的剧目', '暫無可推薦的劇目'),
-        _ => context.zh('还没有观看记录', '還沒有觀看紀錄'),
-      };
-      final c = Theme.of(context).colorScheme;
-      return SliverPadding(
-        padding: EdgeInsets.symmetric(horizontal: inset),
-        sliver: SliverToBoxAdapter(
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: c.surfaceContainerLow,
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(40),
-                bottomRight: Radius.circular(40),
-                topRight: Radius.circular(12),
-                bottomLeft: Radius.circular(12),
-              ),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 42, horizontal: 20),
-              child: Column(
-                children: [
-                  ShapeMark(
-                    [
-                      MaterialShapes.arch,
-                      MaterialShapes.softBurst,
-                      MaterialShapes.pill,
-                    ][tab],
-                    [
-                      Icons.movie_filter_rounded,
-                      Icons.auto_awesome_rounded,
-                      Icons.history_rounded,
-                    ][tab],
-                    size: 92,
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    text,
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-    final scale = MediaQuery.textScalerOf(context).scale(16) / 16;
-    return SliverPadding(
-      padding: EdgeInsets.symmetric(horizontal: inset),
-      sliver: SliverGrid.builder(
-        gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-          maxCrossAxisExtent: width < 550 ? 500 : 360,
-          crossAxisSpacing: 16,
-          mainAxisSpacing: 16,
-          mainAxisExtent: 180 + 82 * scale,
-        ),
-        itemCount: dramas.length,
-        itemBuilder: (context, i) {
-          final d = dramas[i],
-              p = tab == 2 ? library.latest(d.id) : null,
-              c = Theme.of(context).colorScheme;
-          final shape = [
-            MaterialShapes.arch,
-            MaterialShapes.cookie7Sided,
-            MaterialShapes.slanted,
-            MaterialShapes.flower,
-          ][i % 4];
-          final single = d.episodes.singleOrNull;
-          final origin = library.publishers[d.id];
-          final availability = single?.title ?? '${d.episodes.length} 集';
-          Widget fallback() => ColoredBox(
-            color: c.secondaryContainer,
-            child: Center(
-              child: ShapeMark(shape, Icons.play_arrow_rounded, size: 92),
-            ),
-          );
-          return Card.filled(
-            margin: EdgeInsets.zero,
-            clipBehavior: Clip.antiAlias,
-            child: InkWell(
-              onTap: () => _watch(d),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Expanded(
-                    child: LayoutBuilder(
-                      builder: (context, bounds) {
-                        final pixels =
-                            (bounds.maxWidth *
-                                    MediaQuery.devicePixelRatioOf(context))
-                                .ceil();
-                        return Image(
-                          image: ResizeImage(
-                            AssetImage(
-                              'assets/posters/${origin!.name}-${d.episodes.first.id}.webp',
-                            ),
-                            width: ((pixels + 63) ~/ 64 * 64).clamp(64, 560),
-                            policy: ResizeImagePolicy.fit,
-                          ),
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) => fallback(),
-                        );
-                      },
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.all(14),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          d.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          tab == 2 && p != null
-                              ? '${d.episodes.where((e) => e.id == p.episode).firstOrNull?.title ?? ''} · ${clock(p.positionMs)}'
-                              : '$availability   ${d.tags.join(' · ')}',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
 }

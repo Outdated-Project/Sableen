@@ -1,39 +1,64 @@
-# Sableen 红果剧场
+<p align="center"><img src="assets/brand/sableen.png" alt="Sableen 图标" width="76"></p>
+<h1 align="center">Sableen 红果剧场</h1>
+<p align="center">在一个播放器里浏览短剧与漫剧，按分集续播，保存到设备。</p>
+<p align="center"><a href="README_EN.md">English</a> · <a href="#当前片库">片库实测</a> · <a href="#构建与验证">构建与验证</a> · <a href="https://github.com/blueokanna/Sableen/actions/workflows/stable.yml">构建记录</a></p>
 
-[English](README_EN.md)
+**1.0.1 候选版的内容状态**　随包剧单有 40 部作品，每部目前可在应用内播放、下载一条约 10 秒的片段。整集 1080p 验收结果为 **0/40**，稳定版仍待发布。
 
-Sableen 在同一个剧场里提供红果短剧和红果漫剧。界面支持简体、繁体、系统动态配色、Monet 与 AMOLED 黑色主题。搜索、历史和推荐都在设备上运行。
+<p align="center"><img src="docs/theater.webp" alt="Sableen 剧场实拍，手机和宽屏都在首行并列展示短剧与漫剧" width="900"></p>
 
-## 现在能播什么
+## 当前片库
 
-| 红果官网榜单 | 1.0.1 随包核验结果 | 可直接核对的作品 |
-| --- | --- | --- |
-| [真人剧热播榜](https://hongguoduanju.com/rank/hot-real-drama) | 20 部，每部 1 条公开片段 | [《少夫人来自东北3》播放页](https://hongguoduanju.com/player/7706512650816982040) · [实测 10.08 秒 MP4](https://hongguoduanju.com/video/public/7706514645208534041/360p.mp4) |
-| [漫剧热播榜](https://hongguoduanju.com/rank/hot-comic-drama) | 20 部，每部 1 条公开片段 | [《公路求生榜一说她要走到公路尽头第三季》播放页](https://hongguoduanju.com/player/7708355462780947518) · [实测 10.07 秒 MP4](https://hongguoduanju.com/video/public/7708355470964050969/360p.mp4) |
+2026 年 11 月 22 日核验了两个榜单各 20 个文件。下表列出各榜首集。视频轨时长来自 `ffprobe`，片尾画面由 FFmpeg 实际解码。MP4 容器还包含音轨，容器总时长可以略长于视频轨。
 
-2026 年 11 月 22 日，在没有账号和既有 Cookie 的桌面 Chrome 中，关闭红果官网的登录弹窗后，上表两部作品的首集都能播放。播放器报告的集长分别为 178.97 秒和 115.87 秒。通过官网进度条跳到片尾附近后，两集画面都继续前进。Sableen 播放控件里的「红果官网观看」打开对应分集。官网内的进度由红果播放器管理。
+| 榜单与作品 | 分集 ID | 发布页标注 | 应用可播视频轨 |
+| --- | --- | ---: | --- |
+| 真人剧 ·《少夫人来自东北3》 | `7706514645208534041` | 178 秒 | 10.00 秒 · 360 × 640 · 25 fps |
+| 漫剧 ·《公路求生榜一说她要走到公路尽头第三季》 | `7708355470964050969` | 115 秒 | 10.00 秒 · 640 × 360 · 30 fps |
 
-Sableen 自带播放器和离线下载使用发布页标明的 `VideoObject.contentUrl`。刷新工具校对作品和分集 ID，用 `ffprobe` 测量公开 MP4 的实际时长。这 40 个文件均为约 10 秒的片段。榜单、封面随包提供。
+在新的桌面 Chrome 会话中，上述两集在红果网站分别连续播放至 178.48 秒和 115.40 秒。Sableen 使用发布页公开列出的媒体文件。两个样本的公开文件都在约 10 秒处结束。应用按媒体实际时长播放并显示解码尺寸。[真人剧分集](https://hongguoduanju.com/player/7706512650816982040) · [漫剧分集](https://hongguoduanju.com/player/7708355462780947518)
 
-## 播放和设备行为
+## 在剧场里观看
 
-Android 在红果仅提供片段或播放失败时显示「西饭」。点按后打开设备上已安装的西饭短剧，可在西饭内搜索剧名。西饭尚未提供可核验的跨平台分集链接，切换时不会同步集数或进度。
+| 页面 | 可以做什么 |
+| --- | --- |
+| **剧场** | 「全部」按榜单名次交替排列短剧与漫剧。可按剧名或题材搜索，也可切换到猜你喜欢、红果短剧、红果漫剧。 |
+| **历史纪录** | 从上次的位置继续观看，或清空本机历史。历史按作品和分集 ID 保存，最多 512 条。 |
+| **下载** | 查看进度，暂停、继续或重试任务，点已保存的分集直接播放。 |
+| **设置** | 切换简繁中文、单列或双列、动态配色、Monet 和 AMOLED。导航提供实色、模糊、液态玻璃与 Aero 玻璃。 |
 
-### 离线下载
+点剧卡进入全屏。轻点中央暂停或继续，点边缘或移动鼠标唤回控件。屏幕方向按钮可切换横屏，画面保持原始比例。可见窗口失去焦点时继续播放，隐藏时暂停。Android 和支持标准画中画的浏览器可进入小窗。播放器关闭后释放解码器。
 
-在原生播放器中打开「离线下载」，选择标有集数和可用时长的视频。也可以在首页查看队列、暂停全部任务或继续下载。再次点开已保存的剧目时，播放器优先使用设备内的副本。Web 版在线播放。下载运行于应用进程内，退出应用后可重新添加未完成的分集。
+推荐使用实际观看时长和题材，权重每 21 天减半。拖动和缓冲不增加观看时间。剧单、封面和历史在设备端读取，无需 Sableen 账号。
 
-每个任务使用发布方公开的 MP4 和系统代理设置。队列最多同时传输两集，达到 1 MiB 的视频可用两条 Range 请求，总计最多四段。下载遇到短暂网络错误会有限重试。进度按 250 毫秒合并通知。文件在独立工作目录中组装，后台校验随包剧单记录的字节数和 SHA-256，校验通过后才显示「已保存」。本次收录的 40 条视频均为片段，可用时长与在线播放一致。
+## 保存与续传
 
-点开剧卡进入全屏，轻点中央暂停或继续。播放时控件在三秒后收起，点画面边缘或移动鼠标可重新显示。隐藏应用时暂停，单纯失去窗口焦点时继续播放。支持系统画中画的 Android 设备和支持标准画中画接口的浏览器可从播放器右上角进入小窗。返回前台后由用户决定是否继续。
+1. 在播放器中打开 **离线下载**，选择当前分集。多集作品还提供整部下载。
+2. 在 **下载** 页查看传输与校验状态。原生端按系统代理设置传输，最多同时下载两集，每集最多两条 Range 请求。重新打开应用后，残留分段可以从下载页继续。
+3. 文件通过字节数和 SHA-256 校验后显示 **已保存**。再次点开该分集时优先读取本地副本。浏览器把文件存入当前站点的 Cache Storage，清除站点数据会同时清除下载。
 
-单个播放页持有一个解码器，关闭页面时释放。原生播放器请求硬解，Android 根据视频帧率申请同分辨率的兼容显示模式。系统和驱动决定实际解码与刷新率。时间显示独立刷新，封面以 WebP 本地加载。材质设置提供实色、实时模糊、液态折射与 Aero 玻璃。
+Web 发行包提供同源 MP4，浏览器可以读取并校验字节。在 HTTPS 或 localhost 部署，保留包内的 `media/` 目录。已加载的应用可在断网后打开已保存的分集。完全离线冷启动网页还取决于宿主能否加载应用文件。
 
-历史按红果作品和分集 ID 索引，最多保留 512 条。推荐按题材累计有效观看时间，21 天半衰；每条记录的基础权重为 `min(观看毫秒数, 片长) / (片长 + 60000)`。拖动与缓冲时间不算观看。
+## ByteVC2 转码与实测
 
-## 构建和核验
+刷新剧单时，工具从 MP4 视频轨识别 `bvc2`，并用支持该解码器的 FFmpeg 将 SDR 视频转为 H.264。已有 AAC 音轨直接复用。转换完成后核对视频帧数、尺寸、音视频轨起止时间，计算全片 SSIM 和输出 SHA-256，再登记应用使用的文件。解码与编码发生在准备剧单的机器上。[转换实现](tool/transcode_bytevc2.py) · [兼容解码器](https://github.com/wxyzh/ffmpeg-bvc2)
 
-Flutter 应用 `1.0.1+2`，Rust 核心 `1.0.1`。CI 固定 Flutter 3.47.9、Rust 1.99.1 与 flutter_rust_bridge 2.13.0。Rust 用 `nextjson` 读剧单，`courierust` 和 `recurse-x` 校验地址，`rustbinary` 保存历史，`tzcraft` 换算时间。
+在 Intel Core i7-11850H 上，以 FFmpeg `8.1.3-bvc2` 对同一份公开合成样本交替运行三组 x264 编码，每次均为 CRF 18。输入为 160 × 96、2 秒、20 帧、无音轨，两种输出均完整解码出 20 帧。[固定版本测试素材](https://github.com/jo32/tvbox-silicon/blob/ff2fc2c7a3ca6fc80c39277cca7b57b3ee792252/Tests/TVCoreTests/Fixtures/remux-bvc2.mp4)
+
+| x264 预设 | 转码中位耗时 | 输出大小 | 全片 SSIM |
+| --- | ---: | ---: | ---: |
+| `medium` | 93.17 ms | 9,912 B | 0.996203 |
+| `veryfast` | 87.11 ms | 10,145 B | 0.995055 |
+
+这次实测为 **1.07 倍**，含进程启动时间。红果整集的三倍提速、带声素材的音画同步仍待代表性片源验证。可用以下命令在自己的素材上生成包含原始耗时、帧数、轨道偏差和摘要的 JSON 报告。
+
+```sh
+python tool/transcode_bytevc2.py input.mp4 output.mp4 --benchmark
+```
+
+## 构建与验证
+
+Flutter 应用版本为 `1.0.1+2`，Rust 核心与插件为 `1.0.1`。CI 固定 Flutter `3.47.9`、Rust `1.99.1`、flutter_rust_bridge `2.13.0`。准备 Python、curl、FFmpeg 与 ffprobe 后，在仓库根目录运行以下命令。
 
 ```sh
 flutter pub get --enforce-lockfile
@@ -42,11 +67,11 @@ cargo test --locked --manifest-path rust/Cargo.toml
 flutter analyze --no-pub
 flutter test --no-pub test
 flutter test integration_test/playback_test.dart -d windows
-python tool/ci/check_streams.py --require-episodes
+python tool/ci/check_streams.py --require-episodes --report source-measurements.json
 ```
 
-更新剧单运行 `python tool/refresh_catalogs.py`，需要 Python、curl、ffprobe 和 ffmpeg。Flutter 支持 Android、iOS、Windows、macOS、Linux 与 Web 构建。Web 还需先生成 Rust Wasm，详见工作流中的 `web` 任务。服务器应提供正确的 Wasm MIME 类型，以及 `Cross-Origin-Opener-Policy: same-origin` 和 `Cross-Origin-Embedder-Policy: credentialless` 两个响应头。[完整构建命令](.github/workflows/stable.yml)
+`python tool/refresh_catalogs.py` 按发布方的作品、分集和视频关联更新剧单。可设置 `SABLEEN_FFMPEG` 与 `SABLEEN_FFPROBE` 指向支持 ByteVC2 的构建。Rust 通过 `nextjson` 解析剧单、`courierust` 与 `recurse-x` 校验地址、`rustbinary` 编解码历史、`tzcraft` 计算时间权重。
 
-## 发行
+Web 构建先生成 Rust Wasm，再构建 Flutter 并运行 `python tool/stage_web_media.py build/web`。服务器应以 `application/wasm` 提供 Wasm，发送 `Cross-Origin-Opener-Policy: same-origin` 与 `Cross-Origin-Embedder-Policy: credentialless`。[六端构建命令](.github/workflows/stable.yml)
 
-`main` 的候选版本必须通过六端检查，并且两类内容都要有可验证的正片。通过后上传 Windows x64 安装程序、签名 Android 通用 APK、Ubuntu 24.04 x64 DEB、Web ZIP 和 `SHA256SUMS`。CI 逐个比对构建端与上传后的摘要。可用 `gh attestation verify <文件> --repo blueokanna/Sableen` 验证来源。Windows 缺少 Authenticode，Apple 安装包还需要发行签名配置。[构建记录](https://github.com/blueokanna/Sableen/actions/workflows/stable.yml) · [已发布版本](https://github.com/blueokanna/Sableen/releases)
+六端检查与包完整性检查通过后，每个收录文件还须匹配分集时长、能在片尾解码，并达到横屏 1920 × 1080 或竖屏 1080 × 1920。GitHub Actions 的 `source-measurements` 包含逐集数据。发行物为签名 Android APK、Windows x64 安装程序、Ubuntu 24.04 x64 DEB、Web ZIP 和 `SHA256SUMS`。iOS 与 macOS 在 CI 构建和测试，Apple 分发签名与 Windows Authenticode 签名待配置。[发行记录](https://github.com/blueokanna/Sableen/releases)

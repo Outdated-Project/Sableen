@@ -31,6 +31,22 @@ Future<bool> videoInSmallWindow() async {
 
 Future<void> _macWindowChange = Future<void>.value();
 
+Future<void> setPlaybackLandscape(bool enabled) async {
+  if (kIsWeb ||
+      !(androidVideo || defaultTargetPlatform == TargetPlatform.iOS)) {
+    return;
+  }
+  try {
+    await SystemChrome.setPreferredOrientations(
+      enabled
+          ? [DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight]
+          : [],
+    );
+  } on PlatformException catch (error) {
+    debugPrint('Device orientation request declined: ${error.code}');
+  }
+}
+
 Future<void> setTheaterFullscreen(bool enabled) async {
   if (!kIsWeb && defaultTargetPlatform == TargetPlatform.macOS) {
     // A second card can open while the first window is still leaving fullscreen.

@@ -43,16 +43,21 @@ void main() {
         expect(find.text('紅果短劇'), findsOneWidget);
         expect(find.text('紅果漫劇'), findsOneWidget);
         expect(find.text('沒有符合的劇目'), findsOneWidget);
-        await tester.tap(find.text('歷史'));
+        expect(find.text('猜你喜歡'), findsOneWidget);
+        expect(find.byType(NavigationDestination), findsNWidgets(4));
+        await tester.tap(find.text('歷史紀錄'));
         await tester.pumpAndSettle();
         expect(find.text('還沒有觀看紀錄'), findsOneWidget);
-        await tester.tap(find.byTooltip('設定'));
+        await tester.tap(find.text('設定'));
         await tester.pumpAndSettle();
         await tester.tap(find.text('高斯模糊'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.widgetWithText(ChoiceChip, '一列'));
         await tester.pumpAndSettle();
         final restored = Preferences(disk);
         await restored.restore();
         expect(restored.glass, Glass.blur);
+        expect(restored.columns, 1);
         expect(tester.takeException(), isNull);
       }
     },

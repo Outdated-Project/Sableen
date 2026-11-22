@@ -27,12 +27,20 @@ class Library extends ChangeNotifier {
   Future<void> restore() async {
     final titles = <String, Drama>{};
     final origins = <String, Publisher>{};
+    final catalogs = <List<Drama>>[];
+    final renditions = jsonDecode(
+      await rootBundle.loadString('assets/renditions/index.json'),
+    ) as Map<String, dynamic>;
     for (final category in Publisher.values) {
       final data = await rootBundle.load(
         'assets/catalogs/${category.name}.json',
       );
-      final items = await parseCatalog(bytes: Uint8List.sublistView(data));
+      final source = await parseCatalog(bytes: Uint8List.sublistView(data));
+      final items = [
+        for (final drama in source) _withRenditions(drama, renditions),
+      ];
       if (items.isEmpty) throw const FormatException('Empty Hongguo category');
+      catalogs.add(items);
       for (final drama in items) {
         if (titles.containsKey(drama.id)) {
           throw const FormatException('Duplicate title ID');
@@ -42,7 +50,12 @@ class Library extends ChangeNotifier {
       }
     }
     byId = titles;
-    dramas = titles.values.toList(growable: false);
+    // Alternate chart entries without disturbing either publisher's ranking.
+    dramas = [
+      for (var rank = 0; catalogs.any((items) => rank < items.length); rank++)
+        for (final items in catalogs)
+          if (rank < items.length) items[rank],
+    ];
     publishers = origins;
     await _writes;
     try {
@@ -61,6 +74,38 @@ class Library extends ChangeNotifier {
     } catch (_) {
       historyDamaged = true;
     }
+  }
+
+  Drama _withRenditions(Drama drama, Map<String, dynamic> renditions) {
+    if (!drama.episodes.any((e) => renditions.containsKey(e.sha256))) {
+      return drama;
+    }
+    Episode playbackFile(Episode e) {
+      final record = renditions[e.sha256];
+      if (record == null) return e;
+      final hash = record['sha256'] as String;
+      final size = record['bytes'] as int;
+      if (!RegExp(r'^[a-f0-9]{64}$').hasMatch(hash) || size <= 0) {
+        throw const FormatException('Invalid playback rendition');
+      }
+      return Episode(
+        id: e.id,
+        title: e.title,
+        page: e.page,
+        adBreaks: e.adBreaks,
+        url: 'asset:///assets/renditions/$hash.mp4',
+        sha256: hash,
+        bytes: size,
+      );
+    }
+
+    return Drama(
+      id: drama.id,
+      title: drama.title,
+      tags: drama.tags,
+      cover: drama.cover,
+      episodes: drama.episodes.map(playbackFile).toList(growable: false),
+    );
   }
 
   Progress? latest(String id, [String? episode]) => history

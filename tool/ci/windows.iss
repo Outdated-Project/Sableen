@@ -12,6 +12,7 @@ OutputBaseFilename=Sableen-windows-x64-setup
 Compression=lzma2
 SolidCompression=yes
 UninstallDisplayIcon={app}\sableen.exe
+SetupIconFile=..\..\windows\runner\resources\app_icon.ico
 
 [Files]
 Source: "..\..\build\windows\x64\runner\Release\*"; Excludes: "*.pdb"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion

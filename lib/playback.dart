@@ -6,7 +6,6 @@ import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import 'design.dart';
 import 'library.dart';
@@ -44,10 +43,12 @@ class Theater extends StatefulWidget {
     required this.library,
     required this.drama,
     required this.initial,
+    this.poster,
   });
   final Library library;
   final Drama drama;
   final int initial;
+  final ImageProvider? poster;
   @override
   State<Theater> createState() => _TheaterState();
 }
@@ -63,6 +64,7 @@ class _TheaterState extends State<Theater> with WidgetsBindingObserver {
   bool opening = true, failed = false, closed = false, completed = false;
   bool background = false, seeking = false;
   bool showControls = true, smallWindow = false, supportsPip = false;
+  bool landscape = false;
   Timer? hideControls;
   int visibilityChange = 0;
   late final VoidCallback removePipListener;
@@ -70,6 +72,7 @@ class _TheaterState extends State<Theater> with WidgetsBindingObserver {
   double requested = 0;
   int? skippedBreak;
   int? pendingWebStart;
+  String? localSource;
   Episode get episode => widget.drama.episodes[index];
   @override
   void initState() {
@@ -119,6 +122,8 @@ class _TheaterState extends State<Theater> with WidgetsBindingObserver {
         }),
       player.stream.position.listen(_position),
       player.stream.duration.listen((_) => _update()),
+      player.stream.width.listen((_) => _update()),
+      player.stream.height.listen((_) => _update()),
       player.stream.buffering.listen((_) {
         _resetEvidence();
         if (!opening && !player.state.buffering && showControls) {
@@ -197,30 +202,10 @@ class _TheaterState extends State<Theater> with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _openPublisher() async {
-    final uri = Uri.parse(episode.page!);
-    final mobile =
-        !kIsWeb &&
-        (defaultTargetPlatform == TargetPlatform.android ||
-            defaultTargetPlatform == TargetPlatform.iOS);
-    var opened = false;
-    try {
-      opened = await launchUrl(
-        uri,
-        mode: mobile
-            ? LaunchMode.inAppBrowserView
-            : LaunchMode.externalApplication,
-      );
-    } on PlatformException {
-      // Show the episode link if the system cannot open it.
-    }
-    if (!mounted) return;
-    if (opened) {
-      await player.pause();
-    } else {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: SelectableText(uri.toString())));
-    }
+  void _toggleLandscape() {
+    setState(() => landscape = !landscape);
+    unawaited(setPlaybackLandscape(landscape));
+    _reveal();
   }
 
   Future<void> _open(int next) async {
@@ -241,17 +226,26 @@ class _TheaterState extends State<Theater> with WidgetsBindingObserver {
     _cadence();
     _update();
     try {
-      final local = kIsWeb ? null : await offlinePath(episode);
-      if (closed) return;
-      await player.open(
-        Media(
-          local ?? episode.url,
-          start: !kIsWeb && previous > 0
-              ? Duration(milliseconds: previous)
-              : null,
-        ),
-        play: !background,
-      );
+      final local = await offlinePath(episode);
+      if (closed) {
+        releaseOfflinePath(local);
+        return;
+      }
+      final old = localSource;
+      localSource = local;
+      try {
+        await player.open(
+          Media(
+            local ?? episode.url,
+            start: !kIsWeb && previous > 0
+                ? Duration(milliseconds: previous)
+                : null,
+          ),
+          play: !background,
+        );
+      } finally {
+        releaseOfflinePath(old);
+      }
       if (!closed && background) await player.pause();
     } catch (_) {
       failed = true;
@@ -441,6 +435,7 @@ class _TheaterState extends State<Theater> with WidgetsBindingObserver {
   @override
   void dispose() {
     closed = true;
+    if (landscape) unawaited(setPlaybackLandscape(false));
     removePipListener();
     hideControls?.cancel();
     if (androidVideo) displayChannel.setMethodCallHandler(null);
@@ -452,7 +447,9 @@ class _TheaterState extends State<Theater> with WidgetsBindingObserver {
       unawaited(s.cancel());
     }
     timeline.dispose();
-    unawaited(player.dispose());
+    unawaited(
+      player.dispose().whenComplete(() => releaseOfflinePath(localSource)),
+    );
     super.dispose();
   }
 
@@ -514,168 +511,193 @@ class _TheaterState extends State<Theater> with WidgetsBindingObserver {
         ),
       ],
     );
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: MouseRegion(
-        onHover: (_) => _reveal(),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            surface,
-            if (!smallWindow) ...[
-              GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                excludeFromSemantics: true,
-                onTap: _reveal,
-              ),
-              Center(
-                child: FractionallySizedBox(
-                  widthFactor: .45,
-                  heightFactor: .45,
-                  child: GestureDetector(
-                    key: const ValueKey('center-playback'),
-                    behavior: HitTestBehavior.opaque,
-                    onTap: _togglePlaying,
-                    child: Semantics(
-                      button: true,
-                      label: player.state.playing
-                          ? context.zh('暂停', '暫停')
-                          : '播放',
+    final rotate =
+        landscape &&
+        !smallWindow &&
+        MediaQuery.orientationOf(context) == Orientation.portrait;
+    return RotatedBox(
+      quarterTurns: rotate ? 1 : 0,
+      child: Scaffold(
+        backgroundColor: Colors.black,
+        body: MouseRegion(
+          onHover: (_) => _reveal(),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              surface,
+              if (widget.poster case final poster?
+                  when !MediaQuery.disableAnimationsOf(context))
+                Hero(
+                  tag: widget.drama.id,
+                  flightShuttleBuilder: (_, animation, direction, _, _) =>
+                      FadeTransition(
+                        opacity: ReverseAnimation(animation),
+                        child: Image(
+                          image: poster,
+                          fit: BoxFit.contain,
+                          excludeFromSemantics: true,
+                          errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                        ),
+                      ),
+                  child: const SizedBox.expand(),
+                ),
+              if (!smallWindow) ...[
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  excludeFromSemantics: true,
+                  onTap: _reveal,
+                ),
+                Center(
+                  child: FractionallySizedBox(
+                    widthFactor: .45,
+                    heightFactor: .45,
+                    child: GestureDetector(
+                      key: const ValueKey('center-playback'),
+                      behavior: HitTestBehavior.opaque,
+                      onTap: _togglePlaying,
+                      child: Semantics(
+                        button: true,
+                        label: player.state.playing
+                            ? context.zh('暂停', '暫停')
+                            : '播放',
+                      ),
                     ),
                   ),
                 ),
-              ),
-              if (opening || player.state.buffering)
-                const IgnorePointer(
-                  child: Center(child: CircularProgressIndicator()),
-                ),
-              if (failed)
-                Center(
-                  child: FilledButton.tonalIcon(
-                    onPressed: opening ? null : () => _open(index),
-                    icon: const Icon(Icons.refresh_rounded),
-                    label: Text(context.zh('播放失败，重试', '播放失敗，重試')),
+                if (opening || player.state.buffering)
+                  const IgnorePointer(
+                    child: Center(child: CircularProgressIndicator()),
                   ),
-                ),
-              if (showControls || failed)
-                SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.all(8),
-                    child: Column(
-                      children: [
-                        Row(
-                          children: [
-                            IconButton.filledTonal(
-                              tooltip: MaterialLocalizations.of(context)
-                                  .backButtonTooltip,
-                              onPressed: () => Navigator.maybePop(context),
-                              icon: const Icon(Icons.arrow_back_rounded),
-                            ),
-                            const Spacer(),
-                            downloadButton(
-                              widget.library.dramas,
-                              drama: widget.drama,
-                              episode: episode,
-                            ),
-                            if (androidVideo &&
-                                (failed || episode.title.contains('片段')))
-                              TextButton.icon(
-                                onPressed: () async {
-                                  final opened = await displayChannel
-                                      .invokeMethod<bool>('openXifan');
-                                  if (context.mounted && opened != true) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text(
-                                          context.zh(
-                                            '此设备未能打开西饭短剧',
-                                            '此裝置未能開啟西飯短劇',
-                                          ),
-                                        ),
-                                      ),
-                                    );
-                                  }
-                                },
-                                icon: const Icon(Icons.open_in_new),
-                                label: Text(context.zh('西饭', '西飯')),
-                              ),
-                            if (supportsPip)
+                if (failed)
+                  Center(
+                    child: FilledButton.tonalIcon(
+                      onPressed: opening ? null : () => _open(index),
+                      icon: const Icon(Icons.refresh_rounded),
+                      label: Text(context.zh('播放失败，重试', '播放失敗，重試')),
+                    ),
+                  ),
+                if (showControls || failed)
+                  SafeArea(
+                    child: Padding(
+                      padding: const EdgeInsets.all(8),
+                      child: Column(
+                        children: [
+                          Row(
+                            children: [
                               IconButton.filledTonal(
-                                tooltip: context.zh('小窗播放', '小窗播放'),
-                                onPressed: () async {
-                                  final w = player.state.width ?? 0,
-                                      h = player.state.height ?? 0;
-                                  final ok = await enterSmallWindow(
-                                    w > 0 && h > 0 ? w / h : 1.0,
-                                  );
-                                  if (context.mounted && !ok) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text(
-                                          context.zh('系统未开启小窗', '系統未開啟小窗'),
-                                        ),
-                                      ),
-                                    );
-                                  }
-                                },
-                                icon: const Icon(
-                                  Icons.picture_in_picture_alt_rounded,
-                                ),
+                                tooltip: MaterialLocalizations.of(context)
+                                    .backButtonTooltip,
+                                onPressed: () => Navigator.maybePop(context),
+                                icon: const Icon(Icons.arrow_back_rounded),
                               ),
-                          ],
-                        ),
-                        const Spacer(),
-                        ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 720),
-                          child: Card.filled(
-                            child: Padding(
-                              padding: const EdgeInsets.fromLTRB(12, 8, 16, 6),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          '${widget.drama.title} · ${episode.title}',
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: Theme.of(context)
-                                              .textTheme
-                                              .titleSmall,
-                                        ),
-                                      ),
-                                      if (episode.page != null)
-                                        TextButton(
-                                          onPressed: _openPublisher,
-                                          child: Text(
-                                            context.zh('红果官网观看', '紅果官網觀看'),
-                                          ),
-                                        ),
-                                      if (widget.drama.episodes.length > 1)
-                                        IconButton(
-                                          tooltip: context.zh('选集', '選集'),
-                                          icon: const Icon(
-                                            Icons.video_library_outlined,
-                                          ),
-                                          onPressed: opening || seeking
-                                              ? null
-                                              : _selectEpisode,
-                                        ),
-                                    ],
+                              const Spacer(),
+                              downloadButton(
+                                widget.library.dramas,
+                                drama: widget.drama,
+                                episode: episode,
+                              ),
+                              if (androidVideo ||
+                                  (!kIsWeb &&
+                                      defaultTargetPlatform ==
+                                          TargetPlatform.iOS) ||
+                                  landscape ||
+                                  MediaQuery.orientationOf(context) ==
+                                      Orientation.portrait)
+                                IconButton.filledTonal(
+                                  tooltip: landscape
+                                      ? context.zh('跟随设备方向', '跟隨裝置方向')
+                                      : context.zh('横屏播放', '橫向播放'),
+                                  onPressed: _toggleLandscape,
+                                  icon: const Icon(
+                                    Icons.screen_rotation_outlined,
                                   ),
-                                  controls,
-                                ],
+                                ),
+                              if (supportsPip)
+                                IconButton.filledTonal(
+                                  tooltip: context.zh('小窗播放', '小窗播放'),
+                                  onPressed: () async {
+                                    final w = player.state.width ?? 0,
+                                        h = player.state.height ?? 0;
+                                    final ok = await enterSmallWindow(
+                                      w > 0 && h > 0 ? w / h : 1.0,
+                                    );
+                                    if (context.mounted && !ok) {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            context.zh('系统未开启小窗', '系統未開啟小窗'),
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  },
+                                  icon: const Icon(
+                                    Icons.picture_in_picture_alt_rounded,
+                                  ),
+                                ),
+                            ],
+                          ),
+                          const Spacer(),
+                          ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 720),
+                            child: Card.filled(
+                              child: Padding(
+                                padding: const EdgeInsets.fromLTRB(
+                                  12,
+                                  8,
+                                  16,
+                                  6,
+                                ),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            '${widget.drama.title} · ${episode.title}',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .titleSmall,
+                                          ),
+                                        ),
+                                        if ((player.state.width ?? 0) > 0 &&
+                                            (player.state.height ?? 0) > 0)
+                                          Text(
+                                            '${player.state.width}×${player.state.height}',
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .labelSmall,
+                                          ),
+                                        if (widget.drama.episodes.length > 1)
+                                          IconButton(
+                                            tooltip: context.zh('选集', '選集'),
+                                            icon: const Icon(
+                                              Icons.video_library_outlined,
+                                            ),
+                                            onPressed: opening || seeking
+                                                ? null
+                                                : _selectEpisode,
+                                          ),
+                                      ],
+                                    ),
+                                    controls,
+                                  ],
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
-                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
