@@ -6,7 +6,9 @@ const { chromium } = require('playwright-core');
 
 const root = path.resolve(process.argv[2]);
 const mime = { '.html': 'text/html', '.js': 'text/javascript', '.wasm': 'application/wasm', '.json': 'application/json' };
+let disconnected = false;
 const server = http.createServer((req, res) => {
+  if (disconnected) { req.socket.destroy(); return; }
   const pathname = new URL(req.url, 'http://localhost').pathname;
   const file = path.resolve(root, '.' + (pathname === '/' ? '/index.html' : decodeURIComponent(pathname)));
   if (!file.startsWith(root + path.sep) || !fs.statSync(file, { throwIfNoEntry: false })?.isFile()) {
@@ -22,7 +24,8 @@ async function test() {
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const browser = await chromium.launch({ channel: 'chrome' });
   try {
-    const page = await browser.newPage({ viewport: { width: 1000, height: 780 } });
+    const context = await browser.newContext({ viewport: { width: 1000, height: 780 } });
+    const page = await context.newPage();
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
     page.on('requestfailed', req => console.error('Request failed', new URL(req.url()).hostname, req.failure()?.errorText));
@@ -78,15 +81,22 @@ async function test() {
     await page.getByRole('tab', { name: '历史纪录' }).press('Enter');
     for (const [, title] of titles) await page.getByRole('button', { name: new RegExp(title) }).first().waitFor();
     await page.getByRole('tab', { name: '下载' }).press('Enter');
+    disconnected = true;
     await page.context().setOffline(true);
+    await page.close();
+    const offlinePage = await context.newPage();
+    offlinePage.on('pageerror', error => errors.push(error.message));
+    await offlinePage.goto(`http://127.0.0.1:${server.address().port}`);
+    await offlinePage.locator('flt-semantics-placeholder').dispatchEvent('click');
+    await offlinePage.getByRole('tab', { name: '下载' }).press('Enter');
     for (const [, title] of titles) {
-      await page.getByRole('button', { name: new RegExp(title) }).first().press('Enter');
-      await page.waitForFunction(() => {
+      await offlinePage.getByRole('button', { name: new RegExp(title) }).first().press('Enter');
+      await offlinePage.waitForFunction(() => {
         const v = document.querySelector('video');
         return v?.currentSrc.startsWith('blob:') && v.videoWidth > 0 && v.currentTime > .5;
       });
-      await page.mouse.move(80, 60);
-      await page.getByRole('button', { name: '返回', exact: true }).first().evaluate(el => el.click());
+      await offlinePage.mouse.move(80, 60);
+      await offlinePage.getByRole('button', { name: '返回', exact: true }).first().evaluate(el => el.click());
     }
     assert.deepEqual(errors, []);
   } finally {

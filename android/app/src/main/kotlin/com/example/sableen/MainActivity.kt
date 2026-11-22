@@ -3,8 +3,10 @@ package com.example.sableen
 import io.flutter.embedding.android.FlutterActivity
 import android.app.PictureInPictureParams
 import android.content.pm.PackageManager
+import android.content.pm.ActivityInfo
 import android.content.res.Configuration
 import android.os.Build
+import android.provider.Settings
 import android.util.Rational
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -15,6 +17,7 @@ class MainActivity : FlutterActivity() {
     private var requested = 0.0
     private var resumed = false
     private var display: MethodChannel? = null
+    private var orientationBeforePlayback: Int? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -26,6 +29,21 @@ class MainActivity : FlutterActivity() {
                 result.success(null)
             } else when (call.method) {
                 "supportsPip" -> result.success(supportsPip())
+                "setPlaybackLandscape" -> {
+                    if (call.arguments == true) {
+                        // Some devices rewrite the system rotation lock after a forced orientation.
+                        // The player can rotate its own surface while the display is locked.
+                        if (orientationBeforePlayback == null && Settings.System.getInt(contentResolver,
+                                Settings.System.ACCELEROMETER_ROTATION, 0) != 0) {
+                            orientationBeforePlayback = requestedOrientation
+                            requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                        }
+                    } else {
+                        orientationBeforePlayback?.let { requestedOrientation = it }
+                        orientationBeforePlayback = null
+                    }
+                    result.success(null)
+                }
                 "isPip" -> result.success(Build.VERSION.SDK_INT >= 24 && isInPictureInPictureMode)
                 "enterPip" -> {
                     val aspect = (call.arguments as? Number)?.toDouble() ?: 1.0

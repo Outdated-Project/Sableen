@@ -37,6 +37,10 @@ Future<void> setPlaybackLandscape(bool enabled) async {
     return;
   }
   try {
+    if (androidVideo) {
+      await displayChannel.invokeMethod<void>('setPlaybackLandscape', enabled);
+      return;
+    }
     await SystemChrome.setPreferredOrientations(
       enabled
           ? [DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight]

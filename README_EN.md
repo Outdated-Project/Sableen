@@ -37,7 +37,7 @@ Recommendations use time spent watching each genre, with a 21-day half-life. See
 2. Use **下载** to track or pause transfers. Native downloads follow the system proxy, with up to two episodes and two ranges per episode in flight. After restarting, resume retained ranges from Downloads.
 3. An episode becomes available offline after byte-count and SHA-256 verification. Reopening it prefers the saved copy. The Web app uses the browser’s Cache Storage. Clearing site data removes those copies.
 
-The Web distribution includes same-origin MP4s so browsers can read and verify their bytes. Serve it over HTTPS or localhost and retain the `media/` directory. Once the app has loaded, saved episodes can reopen without network access. A fully offline page reload also requires the app shell to be available from the host or browser.
+Serve the complete Web distribution over HTTPS or localhost, including `media/` and `sableen-offline.js`. On the first download the browser also verifies and caches the startup files, fonts and catalogs. Once an episode shows **已保存** (saved), you can close the tab, disconnect and reopen the same address in the same browser to play it from **下载** (Downloads).
 
 ## ByteVC2 conversion and measurement
 
@@ -50,7 +50,7 @@ On an Intel Core i7-11850H, FFmpeg `8.1.3-bvc2` encoded the same public syntheti
 | `medium` | 93.17 ms | 9,912 B | 0.996203 |
 | `veryfast` | 87.11 ms | 10,145 B | 0.995055 |
 
-The measured ratio was **1.07×**, including process startup. A threefold speedup on Hongguo episodes and synchronization on representative material with audio both remain unverified. Run the comparison on another input to obtain the individual timings, frame counts, track-boundary differences and hashes as JSON.
+The measured ratio was **1.07×**, including process startup. A separate conversion added a two-second AAC tone to the fixture. The decoded PCM hashes matched and the track boundaries differed by 0 ms. A threefold speedup and dialogue synchronization still require testing on a representative Hongguo episode with audio. Run the comparison on another input to obtain the individual timings, frame counts, track-boundary differences and hashes as JSON.
 
 ```sh
 python tool/transcode_bytevc2.py input.mp4 output.mp4 --benchmark

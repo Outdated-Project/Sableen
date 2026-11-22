@@ -156,9 +156,41 @@ class DownloadQueue extends ChangeNotifier {
     }
   }
 
+  Future<void> _prepareOfflineApp() async {
+    final filename = web.document
+        .querySelector('meta[name="sableen-offline-worker"]')
+        ?.getAttribute('content');
+    if (filename == null) return;
+    final script = Uri.parse(web.document.baseURI).resolve(filename);
+    final registration = await web.window.navigator.serviceWorker
+        .register(script.toString().toJS)
+        .toDart;
+    if (registration.active?.scriptURL == script.toString()) return;
+    final worker = registration.installing ?? registration.waiting;
+    if (worker == null) throw StateError('Offline installation unavailable');
+    final ready = Completer<void>();
+    void changed(web.Event? _) {
+      if (ready.isCompleted) return;
+      if (worker.state == 'activated') ready.complete();
+      if (worker.state == 'redundant') {
+        ready.completeError(StateError('Offline installation failed'));
+      }
+    }
+
+    final listener = changed.toJS;
+    worker.addEventListener('statechange', listener);
+    try {
+      changed(null);
+      await ready.future.timeout(const Duration(minutes: 3));
+    } finally {
+      worker.removeEventListener('statechange', listener);
+    }
+  }
+
   Future<void> _run(EpisodeDownload job) async {
     final e = job.episode, size = e.bytes!, key = _key(e);
     try {
+      await _prepareOfflineApp();
       final cache = await _cache;
       final parts = <web.Blob>[];
       job.received = 0;
