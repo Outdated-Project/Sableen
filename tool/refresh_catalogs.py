@@ -156,16 +156,20 @@ def listed_ms(video):
     return round(1000 * sum(float(v or 0) * unit for v, unit in zip(declared.groups(), (3600, 60, 1)))) if declared else 0
 
 
-def hongguo_title(item):
-    detail = item['url']
+def published_series(detail):
     match = re.fullmatch(re.escape(HONGGUO) + r'/detail\?series_id=(\d+)', detail)
     if not match:
         return None
-    series_id = match[1]
-    series = next((n for n in publication(detail).nodes if n.get('url') == detail
+    return next((n for n in publication(detail).nodes if n.get('url') == detail
                    and n.get('@type') in ('TVSeries', 'TVSeason') and n.get('episode')), None)
+
+
+def hongguo_title(item):
+    detail = item['url']
+    series = published_series(detail)
     if not series:
         return None
+    series_id = detail.rsplit('=', 1)[1]
     episodes = []
     tags = []
     used = set()
@@ -208,7 +212,7 @@ def hongguo_title(item):
         tags.extend(video.get('genre') or [])
     if episodes:
         return {'id': series_id, 'title': series['name'], 'tags': list(dict.fromkeys(tags)) or ['短剧'],
-                'cover': item.get('image'), 'episodes': episodes}
+                'cover': item.get('image'), 'episode_count': series.get('numberOfEpisodes'), 'episodes': episodes}
     return None
 
 

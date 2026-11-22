@@ -17,7 +17,6 @@ class MainActivity : FlutterActivity() {
     private var requested = 0.0
     private var resumed = false
     private var display: MethodChannel? = null
-    private var orientationBeforePlayback: Int? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -29,18 +28,22 @@ class MainActivity : FlutterActivity() {
                 result.success(null)
             } else when (call.method) {
                 "supportsPip" -> result.success(supportsPip())
-                "setPlaybackLandscape" -> {
-                    if (call.arguments == true) {
+                "setPlaybackOrientation" -> {
+                    if (Build.VERSION.SDK_INT >= 24 && isInMultiWindowMode) {
+                        result.success(null)
+                        return@setMethodCallHandler
+                    }
+                    if (call.arguments == "landscape") {
                         // Some devices rewrite the system rotation lock after a forced orientation.
                         // The player can rotate its own surface while the display is locked.
-                        if (orientationBeforePlayback == null && Settings.System.getInt(contentResolver,
+                        if (Settings.System.getInt(contentResolver,
                                 Settings.System.ACCELEROMETER_ROTATION, 0) != 0) {
-                            orientationBeforePlayback = requestedOrientation
                             requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
                         }
+                    } else if (call.arguments == "portrait") {
+                        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
                     } else {
-                        orientationBeforePlayback?.let { requestedOrientation = it }
-                        orientationBeforePlayback = null
+                        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
                     }
                     result.success(null)
                 }

@@ -74,6 +74,7 @@ class Drama {
   final String title;
   final List<String> tags;
   final String? cover;
+  final int? episodeCount;
   final List<Episode> episodes;
 
   const Drama({
@@ -81,6 +82,7 @@ class Drama {
     required this.title,
     required this.tags,
     this.cover,
+    this.episodeCount,
     required this.episodes,
   });
 
@@ -90,6 +92,7 @@ class Drama {
       title.hashCode ^
       tags.hashCode ^
       cover.hashCode ^
+      episodeCount.hashCode ^
       episodes.hashCode;
 
   @override
@@ -101,6 +104,7 @@ class Drama {
           title == other.title &&
           tags == other.tags &&
           cover == other.cover &&
+          episodeCount == other.episodeCount &&
           episodes == other.episodes;
 }
 

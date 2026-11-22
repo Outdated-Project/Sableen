@@ -10,8 +10,10 @@ import 'package:media_kit_video/media_kit_video.dart';
 import 'design.dart';
 import 'library.dart';
 import 'offline.dart';
+import 'player_sheet.dart';
 import 'playback_window.dart';
 import 'src/rust/api/library.dart';
+import 'video_quality.dart';
 
 bool _acceleratedTexture = true;
 bool _androidEmulator = false;
@@ -139,8 +141,14 @@ class _TheaterState extends State<Theater> with WidgetsBindingObserver {
         if (!playing && !opening) _save();
         _update();
       }),
-      player.stream.tracks.listen((_) => _cadence()),
-      player.stream.track.listen((_) => _cadence()),
+      player.stream.tracks.listen((_) {
+        _cadence();
+        _update();
+      }),
+      player.stream.track.listen((_) {
+        _cadence();
+        _update();
+      }),
       player.stream.completed.listen((done) {
         if (!done || closed || opening || completed) return;
         completed = true;
@@ -175,6 +183,10 @@ class _TheaterState extends State<Theater> with WidgetsBindingObserver {
       showControls = true;
     } else {
       hideControls = Timer(const Duration(seconds: 3), () {
+        if (!closed && ModalRoute.of(context)?.isCurrent == false) {
+          _scheduleControls(player.state.playing);
+          return;
+        }
         if (!closed &&
             dragging == null &&
             !failed &&
@@ -204,7 +216,13 @@ class _TheaterState extends State<Theater> with WidgetsBindingObserver {
 
   void _toggleLandscape() {
     setState(() => landscape = !landscape);
-    unawaited(setPlaybackLandscape(landscape));
+    if (playbackOnPhone(context)) {
+      unawaited(
+        setPhoneOrientation(
+          landscape ? PhoneOrientation.landscape : PhoneOrientation.automatic,
+        ),
+      );
+    }
     _reveal();
   }
 
@@ -435,7 +453,6 @@ class _TheaterState extends State<Theater> with WidgetsBindingObserver {
   @override
   void dispose() {
     closed = true;
-    if (landscape) unawaited(setPlaybackLandscape(false));
     removePipListener();
     hideControls?.cancel();
     if (androidVideo) displayChannel.setMethodCallHandler(null);
@@ -576,125 +593,137 @@ class _TheaterState extends State<Theater> with WidgetsBindingObserver {
                       label: Text(context.zh('播放失败，重试', '播放失敗，重試')),
                     ),
                   ),
-                if (showControls || failed)
-                  SafeArea(
-                    child: Padding(
-                      padding: const EdgeInsets.all(8),
-                      child: Column(
-                        children: [
-                          Row(
-                            children: [
-                              IconButton.filledTonal(
-                                tooltip: MaterialLocalizations.of(context)
-                                    .backButtonTooltip,
-                                onPressed: () => Navigator.maybePop(context),
-                                icon: const Icon(Icons.arrow_back_rounded),
-                              ),
-                              const Spacer(),
-                              downloadButton(
-                                widget.library.dramas,
-                                drama: widget.drama,
-                                episode: episode,
-                              ),
-                              if (androidVideo ||
-                                  (!kIsWeb &&
-                                      defaultTargetPlatform ==
-                                          TargetPlatform.iOS) ||
-                                  landscape ||
-                                  MediaQuery.orientationOf(context) ==
-                                      Orientation.portrait)
-                                IconButton.filledTonal(
-                                  tooltip: landscape
-                                      ? context.zh('跟随设备方向', '跟隨裝置方向')
-                                      : context.zh('横屏播放', '橫向播放'),
-                                  onPressed: _toggleLandscape,
-                                  icon: const Icon(
-                                    Icons.screen_rotation_outlined,
-                                  ),
-                                ),
-                              if (supportsPip)
-                                IconButton.filledTonal(
-                                  tooltip: context.zh('小窗播放', '小窗播放'),
-                                  onPressed: () async {
-                                    final w = player.state.width ?? 0,
-                                        h = player.state.height ?? 0;
-                                    final ok = await enterSmallWindow(
-                                      w > 0 && h > 0 ? w / h : 1.0,
-                                    );
-                                    if (context.mounted && !ok) {
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        SnackBar(
-                                          content: Text(
-                                            context.zh('系统未开启小窗', '系統未開啟小窗'),
-                                          ),
-                                        ),
-                                      );
-                                    }
-                                  },
-                                  icon: const Icon(
-                                    Icons.picture_in_picture_alt_rounded,
-                                  ),
-                                ),
-                            ],
-                          ),
-                          const Spacer(),
-                          ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 720),
-                            child: Card.filled(
-                              child: Padding(
-                                padding: const EdgeInsets.fromLTRB(
-                                  12,
-                                  8,
-                                  16,
-                                  6,
-                                ),
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
+                AnimatedSwitcher(
+                  duration: motion(context),
+                  switchInCurve: fluidCurve,
+                  child: showControls || failed
+                      ? SafeArea(
+                          child: Padding(
+                            padding: const EdgeInsets.all(8),
+                            child: Column(
+                              children: [
+                                Row(
                                   children: [
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: Text(
-                                            '${widget.drama.title} · ${episode.title}',
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: Theme.of(context)
-                                                .textTheme
-                                                .titleSmall,
-                                          ),
-                                        ),
-                                        if ((player.state.width ?? 0) > 0 &&
-                                            (player.state.height ?? 0) > 0)
-                                          Text(
-                                            '${player.state.width}×${player.state.height}',
-                                            style: Theme.of(context)
-                                                .textTheme
-                                                .labelSmall,
-                                          ),
-                                        if (widget.drama.episodes.length > 1)
-                                          IconButton(
-                                            tooltip: context.zh('选集', '選集'),
-                                            icon: const Icon(
-                                              Icons.video_library_outlined,
-                                            ),
-                                            onPressed: opening || seeking
-                                                ? null
-                                                : _selectEpisode,
-                                          ),
-                                      ],
+                                    IconButton.filledTonal(
+                                      tooltip: MaterialLocalizations.of(context)
+                                          .backButtonTooltip,
+                                      onPressed: () =>
+                                          Navigator.maybePop(context),
+                                      icon: const Icon(
+                                        Icons.arrow_back_rounded,
+                                      ),
                                     ),
-                                    controls,
+                                    const Spacer(),
+                                    downloadButton(
+                                      widget.library.dramas,
+                                      drama: widget.drama,
+                                      episode: episode,
+                                      rotated: rotate,
+                                    ),
+                                    if (androidVideo ||
+                                        (!kIsWeb &&
+                                            defaultTargetPlatform ==
+                                                TargetPlatform.iOS) ||
+                                        landscape ||
+                                        MediaQuery.orientationOf(context) ==
+                                            Orientation.portrait)
+                                      IconButton.filledTonal(
+                                        tooltip: landscape
+                                            ? context.zh('跟随设备方向', '跟隨裝置方向')
+                                            : context.zh('横屏播放', '橫向播放'),
+                                        onPressed: _toggleLandscape,
+                                        icon: const Icon(
+                                          Icons.screen_rotation_outlined,
+                                        ),
+                                      ),
+                                    if (supportsPip)
+                                      IconButton.filledTonal(
+                                        tooltip: context.zh('小窗播放', '小窗播放'),
+                                        onPressed: () async {
+                                          final w = player.state.width ?? 0,
+                                              h = player.state.height ?? 0;
+                                          final ok = await enterSmallWindow(
+                                            w > 0 && h > 0 ? w / h : 1.0,
+                                          );
+                                          if (context.mounted && !ok) {
+                                            ScaffoldMessenger.of(context)
+                                                .showSnackBar(
+                                                  SnackBar(
+                                                    content: Text(
+                                                      context.zh(
+                                                        '系统未开启小窗',
+                                                        '系統未開啟小窗',
+                                                      ),
+                                                    ),
+                                                  ),
+                                                );
+                                          }
+                                        },
+                                        icon: const Icon(
+                                          Icons.picture_in_picture_alt_rounded,
+                                        ),
+                                      ),
                                   ],
                                 ),
-                              ),
+                                const Spacer(),
+                                ConstrainedBox(
+                                  constraints: const BoxConstraints(
+                                    maxWidth: 720,
+                                  ),
+                                  child: Card.filled(
+                                    child: Padding(
+                                      padding: const EdgeInsets.fromLTRB(
+                                        12,
+                                        8,
+                                        16,
+                                        6,
+                                      ),
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Expanded(
+                                                child: Text(
+                                                  '${widget.drama.title} · ${episode.title}',
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                  style: Theme.of(context)
+                                                      .textTheme
+                                                      .titleSmall,
+                                                ),
+                                              ),
+                                              VideoQuality(
+                                                player: player,
+                                                enabled: !opening && !seeking,
+                                                rotated: rotate,
+                                              ),
+                                              IconButton(
+                                                tooltip: context.zh('选集', '選集'),
+                                                icon: const Icon(
+                                                  Icons.video_library_outlined,
+                                                ),
+                                                onPressed: opening || seeking
+                                                    ? null
+                                                    : () => _selectEpisode(
+                                                        rotate,
+                                                      ),
+                                              ),
+                                            ],
+                                          ),
+                                          controls,
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                        ],
-                      ),
-                    ),
-                  ),
+                        )
+                      : const SizedBox.shrink(),
+                ),
               ],
             ],
           ),
@@ -703,22 +732,50 @@ class _TheaterState extends State<Theater> with WidgetsBindingObserver {
     );
   }
 
-  Future<void> _selectEpisode() async {
+  Future<void> _selectEpisode(bool rotated) async {
     final episodes = widget.drama.episodes;
-    final selected = await showModalBottomSheet<int>(
+    final total = widget.drama.episodeCount;
+    final selected = await showPlayerSheet<int>(
       context: context,
-      useSafeArea: true,
-      showDragHandle: true,
-      builder: (context) => ListView.builder(
-        shrinkWrap: true,
-        itemCount: episodes.length,
-        itemBuilder: (context, i) => ListTile(
-          selected: i == index,
-          title: Text(episodes[i].title),
-          onTap: () => Navigator.pop(context, i),
-        ),
+      rotated: rotated,
+      builder: (context) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(
+            title: Text(widget.drama.title),
+            subtitle: Text(
+              total == null
+                  ? context.zh(
+                      '可播放 ${episodes.length} 集',
+                      '可播放 ${episodes.length} 集',
+                    )
+                  : context.zh(
+                      '全 $total 集 · 当前可播放 ${episodes.length} 集',
+                      '全 $total 集 · 目前可播放 ${episodes.length} 集',
+                    ),
+            ),
+          ),
+          Flexible(
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: episodes.length,
+              itemBuilder: (context, i) => ListTile(
+                selected: i == index,
+                leading: Icon(
+                  i == index
+                      ? Icons.play_arrow_rounded
+                      : Icons.play_circle_outline,
+                ),
+                title: Text(episodes[i].title),
+                onTap: () => Navigator.pop(context, i),
+              ),
+            ),
+          ),
+        ],
       ),
     );
-    if (!closed && selected != null && selected != index) await _open(selected);
+    if (!closed && !opening && selected != null && selected != index) {
+      await _open(selected);
+    }
   }
 }

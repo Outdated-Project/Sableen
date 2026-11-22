@@ -302,12 +302,14 @@ impl SseDecode for crate::api::library::Drama {
         let mut var_title = <String>::sse_decode(deserializer);
         let mut var_tags = <Vec<String>>::sse_decode(deserializer);
         let mut var_cover = <Option<String>>::sse_decode(deserializer);
+        let mut var_episodeCount = <Option<u32>>::sse_decode(deserializer);
         let mut var_episodes = <Vec<crate::api::library::Episode>>::sse_decode(deserializer);
         return crate::api::library::Drama {
             id: var_id,
             title: var_title,
             tags: var_tags,
             cover: var_cover,
+            episode_count: var_episodeCount,
             episodes: var_episodes,
         };
     }
@@ -596,6 +598,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::library::Drama {
             self.title.into_into_dart().into_dart(),
             self.tags.into_into_dart().into_dart(),
             self.cover.into_into_dart().into_dart(),
+            self.episode_count.into_into_dart().into_dart(),
             self.episodes.into_into_dart().into_dart(),
         ]
         .into_dart()
@@ -692,6 +695,7 @@ impl SseEncode for crate::api::library::Drama {
         <String>::sse_encode(self.title, serializer);
         <Vec<String>>::sse_encode(self.tags, serializer);
         <Option<String>>::sse_encode(self.cover, serializer);
+        <Option<u32>>::sse_encode(self.episode_count, serializer);
         <Vec<crate::api::library::Episode>>::sse_encode(self.episodes, serializer);
     }
 }

@@ -3,6 +3,7 @@ import 'package:material_ui/material_ui.dart';
 import 'design.dart';
 import 'download_web_queue.dart' if (dart.library.io) 'download_queue.dart';
 import 'download_status.dart';
+import 'player_sheet.dart';
 import 'src/rust/api/library.dart';
 
 final _downloads = DownloadQueue();
@@ -23,19 +24,22 @@ Future<String?> offlinePath(Episode episode) async {
 
 void releaseOfflinePath(String? path) => _downloads.releasePath(path);
 
-Widget downloadButton(List<Drama> catalog, {Drama? drama, Episode? episode}) =>
-    Builder(
-      builder: (context) => IconButton.filledTonal(
-        tooltip: context.zh('离线下载', '離線下載'),
-        icon: const Icon(Icons.download_outlined),
-        onPressed: () => showModalBottomSheet<void>(
-          context: context,
-          useSafeArea: true,
-          showDragHandle: true,
-          builder: (_) => _DownloadSheet(catalog, drama, episode),
-        ),
-      ),
-    );
+Widget downloadButton(
+  List<Drama> catalog, {
+  Drama? drama,
+  Episode? episode,
+  bool rotated = false,
+}) => Builder(
+  builder: (context) => IconButton.filledTonal(
+    tooltip: context.zh('离线下载', '離線下載'),
+    icon: const Icon(Icons.download_outlined),
+    onPressed: () => showPlayerSheet<void>(
+      context: context,
+      rotated: rotated,
+      builder: (_) => _DownloadSheet(catalog, drama, episode),
+    ),
+  ),
+);
 
 class _DownloadSheet extends StatefulWidget {
   const _DownloadSheet(this.catalog, this.drama, this.episode, {this.play});
@@ -53,9 +57,14 @@ class _DownloadSheetState extends State<_DownloadSheet> {
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: _downloads,
     builder: (context, _) {
-      final jobs = _downloads.jobs.values.toList();
       final episode = widget.episode;
       final drama = widget.drama;
+      final current = _downloads.jobs[episode?.sha256];
+      final jobs = _downloads.jobs.values.toList();
+      if (current != null && jobs.last != current) {
+        jobs.remove(current);
+        jobs.add(current);
+      }
       final canResume =
           _downloads.paused || jobs.any((j) => j.state == DownloadState.paused);
       return Column(
@@ -113,7 +122,7 @@ class _DownloadSheetState extends State<_DownloadSheet> {
                 return ListView.builder(
                   itemCount: jobs.length,
                   itemBuilder: (context, i) {
-                    final job = jobs[i];
+                    final job = jobs[jobs.length - 1 - i];
                     final label = switch (job.state) {
                       DownloadState.queued => context.zh('排队中', '排隊中'),
                       DownloadState.fetching =>

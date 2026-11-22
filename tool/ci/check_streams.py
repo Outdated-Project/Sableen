@@ -10,7 +10,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from refresh_catalogs import (HONGGUO, RANKS, ROOT, video_track, fingerprint, listed_ms,
-                              media_snapshot, public_encodings, publication, published_video)
+                              media_snapshot, public_encodings, publication, published_series, published_video)
 
 
 def decode_end(path, duration):
@@ -64,10 +64,16 @@ def check(record):
     expected = f'第{number}集' + ('' if full else f' · {round(measured / 1000)} 秒片段')
     if episode['title'] != expected:
         raise ValueError(f'Incorrect preview label on {page}')
-    return {'series_id': series, 'episode_id': item_id, 'measured_ms': measured,
+    return {'series_id': series, 'episode_id': item_id, 'episode_number': number, 'measured_ms': measured,
             'listed_ms': listed, 'width': width, 'height': height, 'codec_tag': codec, 'full': full,
             'full_hd': full and min(width, height) >= 1080 and max(width, height) >= 1920,
             'bytes': episode['bytes'], 'sha256': episode['sha256']}
+
+
+def complete_series(tracks, count):
+    if len(tracks) != count or not all(track['full_hd'] for track in tracks):
+        return False
+    return sorted(track['episode_number'] for track in tracks) == list(range(1, count + 1))
 
 
 def main():
@@ -79,7 +85,7 @@ def main():
         raise ValueError('Unexpected bundled catalogs')
     missing = []
     report = {}
-    summary = ['| Catalog | Files checked | Duration matched | Full 1080p |', '| --- | ---: | ---: | ---: |']
+    summary = ['| Catalog | Files checked | Duration matched | Full 1080p | Complete series |', '| --- | ---: | ---: | ---: | ---: |']
     with ThreadPoolExecutor(max_workers=4) as pool:
         for category in RANKS:
             dramas = json.loads((ROOT / f'{category}.json').read_bytes())['dramas']
@@ -87,13 +93,27 @@ def main():
             if not records:
                 raise ValueError(f'{category} has no media')
             tracks = list(pool.map(check, records))
+            seasons = pool.map(published_series, [f'{HONGGUO}/detail?series_id={d["id"]}' for d in dramas])
+            complete = 0
+            by_series = {d['id']: [] for d in dramas}
+            for track in tracks:
+                by_series[track['series_id']].append(track)
+            for drama, season in zip(dramas, seasons):
+                count = (season or {}).get('numberOfEpisodes')
+                if type(count) is not int or count < 1 or drama.get('episode_count') != count:
+                    raise ValueError(f'Invalid or stale episode count for {drama["id"]}')
+                series_tracks = by_series[drama['id']]
+                complete += complete_series(series_tracks, count)
+                for t in series_tracks:
+                    t['listed_episodes'] = count
             report[category] = tracks
             full = sum(track['full'] for track in tracks)
             full_hd = sum(track['full_hd'] for track in tracks)
-            summary.append(f'| {category} | {len(records)} | {full} | {full_hd} |')
-            print(f'{category}: {len(records)} verified, {full} full episodes, {full_hd} full episodes at 1080p or higher', flush=True)
-            if full_hd != len(records):
+            summary.append(f'| {category} | {len(records)} | {full} | {full_hd} | {complete}/{len(dramas)} |')
+            print(f'{category}: {len(records)} verified, {full} full episodes, {full_hd} at full HD, {complete}/{len(dramas)} complete series', flush=True)
+            if complete != len(dramas) or full_hd != len(records):
                 missing.append(category)
+            if full_hd != len(records):
                 first = next(t for t in tracks if not t['full_hd'])
                 print(f"Episode {first['episode_id']}: decoded {first['width']}x{first['height']}, "
                       f"{first['measured_ms']} ms of {first['listed_ms']} ms listed", flush=True)

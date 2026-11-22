@@ -3,7 +3,8 @@ use nextjson::NsonDeserialize;
 use std::collections::{HashMap, HashSet};
 use tzcraft::Duration;
 
-const MAX_BYTES: usize = 1 << 20;
+const MAX_HISTORY_BYTES: usize = 1 << 20;
+const MAX_CATALOG_BYTES: usize = 8 << 20;
 const HISTORY_LIMIT: usize = 512;
 const WATCH_PRIOR_MS: f64 = 60_000.0;
 
@@ -31,6 +32,7 @@ pub struct Drama {
     pub title: String,
     pub tags: Vec<String>,
     pub cover: Option<String>,
+    pub episode_count: Option<u32>,
     pub episodes: Vec<Episode>,
 }
 
@@ -91,7 +93,7 @@ pub fn valid_address(address: &str) -> bool {
 }
 
 pub fn parse_catalog(bytes: Vec<u8>) -> Result<Vec<Drama>, String> {
-    if bytes.len() > MAX_BYTES {
+    if bytes.len() > MAX_CATALOG_BYTES {
         return Err("size".into());
     }
     let catalog: Catalog = nextjson::nextdecode(&bytes).map_err(|_| "json")?;
@@ -109,7 +111,10 @@ pub fn parse_catalog(bytes: Vec<u8>) -> Result<Vec<Drama>, String> {
             || drama.tags.iter().collect::<HashSet<_>>().len() != drama.tags.len()
             || drama.cover.as_ref().is_some_and(|s| !valid_address(s))
             || drama.episodes.is_empty()
-            || drama.episodes.len() > 600
+            || drama.episodes.len() > 2000
+            || drama
+                .episode_count
+                .is_some_and(|total| total < drama.episodes.len() as u32)
         {
             return Err("drama".into());
         }
@@ -172,7 +177,7 @@ fn validate_history(entries: &[Progress]) -> Result<(), String> {
 pub fn pack_history(entries: Vec<Progress>) -> Result<Vec<u8>, String> {
     validate_history(&entries)?;
     let data = rustbinary::options()
-        .with_limit(MAX_BYTES as u64)
+        .with_limit(MAX_HISTORY_BYTES as u64)
         .with_compact_format()
         .serialize(&entries)
         .map_err(|_| "encode")?;
@@ -182,11 +187,11 @@ pub fn pack_history(entries: Vec<Progress>) -> Result<Vec<u8>, String> {
 }
 
 pub fn unpack_history(bytes: Vec<u8>) -> Result<Vec<Progress>, String> {
-    if bytes.len() > MAX_BYTES || !bytes.starts_with(b"SW01") {
+    if bytes.len() > MAX_HISTORY_BYTES || !bytes.starts_with(b"SW01") {
         return Err("version".into());
     }
     let entries: Vec<Progress> = rustbinary::options()
-        .with_limit(MAX_BYTES as u64)
+        .with_limit(MAX_HISTORY_BYTES as u64)
         .with_collection_limit(HISTORY_LIMIT as u64)
         .with_compact_format()
         .deserialize(&bytes[4..])

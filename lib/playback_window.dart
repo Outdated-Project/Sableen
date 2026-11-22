@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart' show BuildContext, View;
 import 'package:media_kit_video/media_kit_video.dart';
 
 import 'web_video_stub.dart'
@@ -31,21 +32,34 @@ Future<bool> videoInSmallWindow() async {
 
 Future<void> _macWindowChange = Future<void>.value();
 
-Future<void> setPlaybackLandscape(bool enabled) async {
+bool playbackOnPhone(BuildContext context) {
   if (kIsWeb ||
       !(androidVideo || defaultTargetPlatform == TargetPlatform.iOS)) {
-    return;
+    return false;
   }
+  final display = View.of(context).display;
+  return display.size.shortestSide / display.devicePixelRatio < 600;
+}
+
+enum PhoneOrientation { automatic, landscape, portrait }
+
+Future<void> setPhoneOrientation(PhoneOrientation orientation) async {
   try {
     if (androidVideo) {
-      await displayChannel.invokeMethod<void>('setPlaybackLandscape', enabled);
+      await displayChannel.invokeMethod<void>(
+        'setPlaybackOrientation',
+        orientation.name,
+      );
       return;
     }
-    await SystemChrome.setPreferredOrientations(
-      enabled
-          ? [DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight]
-          : [],
-    );
+    await SystemChrome.setPreferredOrientations(switch (orientation) {
+      PhoneOrientation.automatic => [],
+      PhoneOrientation.landscape => [
+        DeviceOrientation.landscapeLeft,
+        DeviceOrientation.landscapeRight,
+      ],
+      PhoneOrientation.portrait => [DeviceOrientation.portraitUp],
+    });
   } on PlatformException catch (error) {
     debugPrint('Device orientation request declined: ${error.code}');
   }

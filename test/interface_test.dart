@@ -1,9 +1,13 @@
+import 'dart:ui' as ui;
+
+import 'package:flutter/rendering.dart' show RenderRepaintBoundary;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:sableen/design.dart';
 import 'package:sableen/home.dart';
 import 'package:sableen/library.dart';
 import 'package:sableen/preferences.dart';
+import 'package:sableen/theater_navigation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class _Disk extends Fake implements SharedPreferencesAsync {
@@ -18,6 +22,83 @@ class _Disk extends Fake implements SharedPreferencesAsync {
 }
 
 void main() {
+  testWidgets('Glass follows the content directly under the bottom bar', (
+    tester,
+  ) async {
+    final boundary = GlobalKey();
+    final controller = ScrollController();
+    addTearDown(controller.dispose);
+    for (final mode in [Glass.aero, Glass.liquid]) {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Center(
+              child: RepaintBoundary(
+                key: boundary,
+                child: SizedBox(
+                  width: 360,
+                  height: 300,
+                  child: Stack(
+                    children: [
+                      ListView(
+                        controller: controller,
+                        padding: EdgeInsets.zero,
+                        children: const [
+                          SizedBox(
+                            height: 220,
+                            child: ColoredBox(color: Colors.blue),
+                          ),
+                          SizedBox(
+                            height: 100,
+                            child: ColoredBox(color: Color(0xffff0000)),
+                          ),
+                          SizedBox(
+                            height: 100,
+                            child: ColoredBox(color: Color(0xff00ff00)),
+                          ),
+                        ],
+                      ),
+                      Align(
+                        alignment: Alignment.bottomCenter,
+                        child: TheaterNavigation(
+                          mode: mode,
+                          index: 0,
+                          select: (_) {},
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      Future<List<int>> sample(double offset) async {
+        controller.jumpTo(offset);
+        await tester.pumpAndSettle();
+        final layer =
+            boundary.currentContext!.findRenderObject()
+                as RenderRepaintBoundary;
+        final pixels = await tester.runAsync(() async {
+          final image = await layer.toImage();
+          try {
+            return await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+          } finally {
+            image.dispose();
+          }
+        });
+        // Inside the transparent bar, between two destination icons.
+        final start = 4 * (263 * 360 + 180);
+        return pixels!.buffer.asUint8List(pixels.offsetInBytes + start, 3);
+      }
+
+      final red = await sample(0);
+      final green = await sample(100);
+      expect(red[0] - green[0], greaterThan(18), reason: mode.name);
+      expect(green[1] - red[1], greaterThan(18), reason: mode.name);
+    }
+  });
   testWidgets(
     'Compact and wide layouts expose history and persist the chosen glass',
     (tester) async {

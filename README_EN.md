@@ -9,7 +9,7 @@
 
 ## Catalog
 
-On November 22, 2026, all 20 files in each chart were checked. The examples below are the first episodes of the top-ranked titles. Durations refer to the video track measured with `ffprobe`. FFmpeg also decoded a frame near the end of each file. Container durations can be slightly longer because they include audio.
+On November 22, 2026, the publisher listed 1,596 episodes across 20 live-action titles and 6,804 across 20 animated titles. The bundled catalog has one first-episode preview per title. The release check compares each series against its published episode count and checks for a continuous sequence in full HD. The table shows the video track duration from `ffprobe`. FFmpeg decoded a frame near the end of each file.
 
 | Chart and title | Episode ID | Listed duration | Video available in Sableen |
 | --- | --- | ---: | --- |
@@ -27,7 +27,11 @@ In fresh desktop Chrome sessions, Hongguo’s website played these episodes cont
 | **下载 · Downloads** | Follow transfers, pause, resume or retry, and select a saved episode to play it. |
 | **设置 · Settings** | Select Simplified or Traditional Chinese, one or two columns, Dynamic Color, Monet or AMOLED. Navigation materials include solid, blur, Liquid Glass and Aero Glass. |
 
-Opening a title enters fullscreen. Tap the center to pause or continue. Tap the edge or move the pointer to reveal the controls. A rotation control switches to landscape while preserving the picture’s aspect ratio. A visible window can keep playing while unfocused. Hiding the app pauses playback. Supported Android devices and browsers offer picture-in-picture. Closing the player releases its decoder.
+The theater opens in two columns. Use the layout button beside the title to switch to one column. The choice persists across launches. Aero uses a tinted toolbar along the bottom edge. Liquid uses a floating, rounded bar. Flutter composites both materials from the scrolling content directly beneath the bar. High contrast uses an opaque surface.
+
+A Windows profile build scrolled through 40 titles at `1264 × 681`, recording 364 frames per material. Aero reached 2.34 ms for P95 build time and 4.32 ms for P95 raster time. Liquid reached 2.13 ms and 3.80 ms respectively. The Flutter image cache peaked at 2.26 MiB in both runs. Peak process working sets were 194.8 MiB and 192.0 MiB respectively.
+
+Opening a title enters fullscreen. Tap the center to pause or continue, or tap the edge to reveal the controls. The episode picker lists the playable files and the published series length. The player shows decoded dimensions. Native players offer a resolution choice when a file contains video tracks of different sizes. Phones return to portrait after playback. Tablets and desktop windows retain their orientation. Visible windows can keep playing while unfocused. Hiding the app pauses playback. Supported Android devices and browsers offer picture-in-picture.
 
 Recommendations use time spent watching each genre, with a 21-day half-life. Seeking and buffering add no viewing time. Search, preferences and history stay on the device. Viewing requires no Sableen account.
 

@@ -12,6 +12,7 @@ import 'playback.dart';
 import 'playback_window.dart';
 import 'preferences.dart';
 import 'src/rust/api/library.dart';
+import 'theater_navigation.dart';
 
 enum _Filter { all, recommended, live, comic }
 
@@ -65,6 +66,9 @@ class _HomeState extends State<Home> {
       final fullscreen = setTheaterFullscreen(true);
       if (!kIsWeb) {
         await fullscreen;
+        if (mounted && playbackOnPhone(context)) {
+          await setPhoneOrientation(PhoneOrientation.automatic);
+        }
       } else {
         unawaited(fullscreen);
       }
@@ -81,8 +85,14 @@ class _HomeState extends State<Home> {
         ),
       );
     } finally {
-      await setTheaterFullscreen(false);
-      enteringTheater = false;
+      try {
+        if (mounted && playbackOnPhone(context)) {
+          await setPhoneOrientation(PhoneOrientation.portrait);
+        }
+        await setTheaterFullscreen(false);
+      } finally {
+        enteringTheater = false;
+      }
     }
     if (mounted && filter == _Filter.recommended) _setFilter(filter);
   }
@@ -122,7 +132,17 @@ class _HomeState extends State<Home> {
 
   Widget _catalog(BuildContext context, {required bool history}) {
     final seen = <String>{};
-    final insets = MediaQuery.sizeOf(context).width >= 760 ? 36.0 : 16.0;
+    final wide = MediaQuery.sizeOf(context).width >= 760;
+    final insets = wide ? 36.0 : 16.0;
+    final colors = Theme.of(context).colorScheme;
+    final searchField = TextField(
+      controller: search,
+      decoration: InputDecoration(
+        prefixIcon: const Icon(Icons.search_rounded),
+        hintText: context.zh('搜索剧名或题材', '搜尋劇名或題材'),
+      ),
+      onChanged: (s) => setState(() => query = s.trim()),
+    );
     Widget shelf(List<Drama> items) => DramaShelf(
       library: library,
       columns: widget.preferences.columns,
@@ -140,11 +160,16 @@ class _HomeState extends State<Home> {
       context.zh('红果漫剧', '紅果漫劇'),
     ];
     return CustomScrollView(
-      key: PageStorageKey(history ? 'history' : 'catalog'),
+      key: PageStorageKey(history ? 'history' : 'catalog-${filter.name}'),
       scrollCacheExtent: const ScrollCacheExtent.pixels(150),
       slivers: [
         SliverPadding(
-          padding: EdgeInsets.fromLTRB(insets, 20, insets, 18),
+          padding: EdgeInsets.fromLTRB(
+            insets,
+            wide ? 30 : 18,
+            insets,
+            wide ? 20 : 12,
+          ),
           sliver: SliverToBoxAdapter(
             child: Row(
               children: [
@@ -163,10 +188,29 @@ class _HomeState extends State<Home> {
                     history
                         ? context.zh('历史纪录', '歷史紀錄')
                         : context.zh('剧场', '劇場'),
-                    style: Theme.of(context).textTheme.headlineMedium
-                        ?.copyWith(fontWeight: FontWeight.w700),
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -1.2,
+                    ),
                   ),
                 ),
+                if (wide && !history) SizedBox(width: 300, child: searchField),
+                if (!history)
+                  IconButton(
+                    tooltip: widget.preferences.columns == 2
+                        ? context.zh('切换为单列', '切換為單列')
+                        : context.zh('切换为双列', '切換為雙列'),
+                    icon: Icon(
+                      widget.preferences.columns == 2
+                          ? Icons.view_agenda_outlined
+                          : Icons.grid_view_rounded,
+                    ),
+                    onPressed: () => context.choosePreference(
+                      widget.preferences,
+                      'columns',
+                      widget.preferences.columns == 2 ? '1' : '2',
+                    ),
+                  ),
                 if (history &&
                     (library.history.isNotEmpty || library.historyDamaged))
                   IconButton(
@@ -196,24 +240,28 @@ class _HomeState extends State<Home> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  TextField(
-                    controller: search,
-                    decoration: InputDecoration(
-                      prefixIcon: const Icon(Icons.search_rounded),
-                      hintText: context.zh('搜索剧名或题材', '搜尋劇名或題材'),
-                    ),
-                    onChanged: (s) => setState(() => query = s.trim()),
-                  ),
-                  const SizedBox(height: 12),
+                  if (!wide) ...[searchField, const SizedBox(height: 8)],
                   Wrap(
                     spacing: 5,
                     runSpacing: 2,
                     children: [
                       for (final item in _Filter.values)
                         ChoiceChip(
+                          materialTapTargetSize: MaterialTapTargetSize.padded,
                           shape: const StadiumBorder(),
                           label: Text(labels[item.index]),
                           showCheckmark: false,
+                          side: BorderSide.none,
+                          selectedColor: colors.primary,
+                          backgroundColor: colors.surfaceContainer,
+                          labelStyle: TextStyle(
+                            fontWeight: filter == item
+                                ? FontWeight.w700
+                                : FontWeight.w500,
+                            color: filter == item
+                                ? colors.onPrimary
+                                : colors.onSurface,
+                          ),
                           padding: const EdgeInsets.symmetric(horizontal: 3),
                           labelPadding: const EdgeInsets.symmetric(
                             horizontal: 6,
@@ -223,7 +271,7 @@ class _HomeState extends State<Home> {
                         ),
                     ],
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 14),
                 ],
               ),
             ),
@@ -290,8 +338,8 @@ class _HomeState extends State<Home> {
                     duration: motion(context),
                     curve: fluidCurve,
                     builder: (context, t, child) => Transform.translate(
-                      offset: Offset(0, 10 * (1 - t)),
-                      child: Opacity(opacity: t, child: child),
+                      offset: Offset(0, 12 * (1 - t)),
+                      child: child,
                     ),
                     child: page,
                   ),
@@ -299,25 +347,19 @@ class _HomeState extends State<Home> {
               ),
               Align(
                 alignment: Alignment.bottomCenter,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 480),
-                    child: Capsule(
-                      mode: widget.preferences.glass,
-                      index: tab,
-                      select: (index) {
-                        if (tab == index) return;
-                        FocusManager.instance.primaryFocus?.unfocus();
-                        setState(() {
-                          tab = index;
-                          if (tab == 0 && filter == _Filter.recommended) {
-                            ranked = library.ranked();
-                          }
-                        });
-                      },
-                    ),
-                  ),
+                child: TheaterNavigation(
+                  mode: widget.preferences.glass,
+                  index: tab,
+                  select: (index) {
+                    if (tab == index) return;
+                    FocusManager.instance.primaryFocus?.unfocus();
+                    setState(() {
+                      tab = index;
+                      if (tab == 0 && filter == _Filter.recommended) {
+                        ranked = library.ranked();
+                      }
+                    });
+                  },
                 ),
               ),
             ],

@@ -336,14 +336,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   Drama dco_decode_drama(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 5)
-      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+    if (arr.length != 6)
+      throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
     return Drama(
       id: dco_decode_String(arr[0]),
       title: dco_decode_String(arr[1]),
       tags: dco_decode_list_String(arr[2]),
       cover: dco_decode_opt_String(arr[3]),
-      episodes: dco_decode_list_episode(arr[4]),
+      episodeCount: dco_decode_opt_box_autoadd_u_32(arr[4]),
+      episodes: dco_decode_list_episode(arr[5]),
     );
   }
 
@@ -514,12 +515,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_title = sse_decode_String(deserializer);
     var var_tags = sse_decode_list_String(deserializer);
     var var_cover = sse_decode_opt_String(deserializer);
+    var var_episodeCount = sse_decode_opt_box_autoadd_u_32(deserializer);
     var var_episodes = sse_decode_list_episode(deserializer);
     return Drama(
       id: var_id,
       title: var_title,
       tags: var_tags,
       cover: var_cover,
+      episodeCount: var_episodeCount,
       episodes: var_episodes,
     );
   }
@@ -760,6 +763,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_String(self.title, serializer);
     sse_encode_list_String(self.tags, serializer);
     sse_encode_opt_String(self.cover, serializer);
+    sse_encode_opt_box_autoadd_u_32(self.episodeCount, serializer);
     sse_encode_list_episode(self.episodes, serializer);
   }
 

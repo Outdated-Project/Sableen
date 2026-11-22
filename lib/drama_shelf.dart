@@ -43,7 +43,7 @@ class DramaShelf extends StatelessWidget {
         final textScale = MediaQuery.textScalerOf(context);
         final extent = horizontal
             ? math.max(
-                134.0,
+                width >= 340 ? (width * .42).clamp(156.0, 222.0) : 138.0,
                 36 + textScale.scale(18) * 3 + textScale.scale(13) * 2,
               )
             : width * 1.25 +
@@ -68,11 +68,11 @@ class DramaShelf extends StatelessWidget {
                     .firstOrNull ??
                 drama.episodes.first;
             final category = origin == Publisher.comic
-                ? context.zh('漫剧', '漫劇')
-                : context.zh('短剧', '短劇');
+                ? context.zh('红果漫剧', '紅果漫劇')
+                : context.zh('红果短剧', '紅果短劇');
             final colors = Theme.of(context).colorScheme;
             final posterWidth = horizontal
-                ? math.min(width * .34, extent * .72)
+                ? math.min(width * .38, extent * .76)
                 : width;
             final pixels =
                 (posterWidth * MediaQuery.devicePixelRatioOf(context) / 32)
@@ -86,7 +86,7 @@ class DramaShelf extends StatelessWidget {
               policy: ResizeImagePolicy.fit,
             );
             final cover = ClipRRect(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(horizontal ? 0 : 12),
               child: Image(
                 image: image,
                 fit: BoxFit.cover,
@@ -122,8 +122,11 @@ class DramaShelf extends StatelessWidget {
                   drama.title,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleMedium
-                      ?.copyWith(height: 1.24, fontWeight: FontWeight.w700),
+                  style:
+                      (horizontal && width >= 340
+                              ? Theme.of(context).textTheme.titleLarge
+                              : Theme.of(context).textTheme.titleMedium)
+                          ?.copyWith(height: 1.24, fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 4),
                 Text(
@@ -152,9 +155,16 @@ class DramaShelf extends StatelessWidget {
             );
             return Material(
               color: horizontal
-                  ? colors.surfaceContainerLow
+                  ? colors.surfaceContainerLowest
                   : Colors.transparent,
-              borderRadius: BorderRadius.circular(16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: horizontal
+                    ? BorderSide(
+                        color: colors.outlineVariant.withValues(alpha: .55),
+                      )
+                    : BorderSide.none,
+              ),
               clipBehavior: Clip.antiAlias,
               child: InkWell(
                 onTap: () => onOpen(drama, image),

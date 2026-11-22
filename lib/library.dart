@@ -104,6 +104,7 @@ class Library extends ChangeNotifier {
       title: drama.title,
       tags: drama.tags,
       cover: drama.cover,
+      episodeCount: drama.episodeCount,
       episodes: drama.episodes.map(playbackFile).toList(growable: false),
     );
   }

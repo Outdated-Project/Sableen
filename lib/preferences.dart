@@ -38,6 +38,23 @@ class Preferences extends ChangeNotifier {
   }
 }
 
+extension PreferenceAction on BuildContext {
+  Future<void> choosePreference(
+    Preferences preferences,
+    String key,
+    String value,
+  ) async {
+    try {
+      await preferences.save(key, value);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(this)
+            .showSnackBar(SnackBar(content: Text(zh('设置保存失败', '設定儲存失敗'))));
+      }
+    }
+  }
+}
+
 class Settings extends StatelessWidget {
   const Settings(this.preferences, {super.key});
   final Preferences preferences;
@@ -65,19 +82,8 @@ class Settings extends StatelessWidget {
                   ChoiceChip(
                     label: Text(v.value),
                     selected: v.key == selected,
-                    onSelected: (_) async {
-                      try {
-                        await preferences.save(key, v.key);
-                      } catch (_) {
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(context.zh('设置保存失败', '設定儲存失敗')),
-                            ),
-                          );
-                        }
-                      }
-                    },
+                    onSelected: (_) =>
+                        context.choosePreference(preferences, key, v.key),
                   ),
               ],
             ),

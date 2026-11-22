@@ -5,9 +5,19 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from refresh_catalogs import HONGGUO, Publication, published_video
+from check_streams import complete_series
 
 
 class PublicEpisodeTests(unittest.TestCase):
+    def test_full_hd_first_episode_does_not_hide_missing_or_duplicate_episodes(self):
+        first = {'episode_number': 1, 'full_hd': True}
+        second = {'episode_number': 2, 'full_hd': True}
+        self.assertTrue(complete_series([second, first], 2))
+        self.assertFalse(complete_series([first], 2))
+        self.assertFalse(complete_series([first, first], 2))
+        self.assertFalse(complete_series([first, second, first], 2))
+        self.assertFalse(complete_series([first, dict(second, full_hd=False)], 2))
+
     def resolve(self, media, item='22', video_id='#video', page_id='22', series='11'):
         page = f'{HONGGUO}/player/11/{page_id}'
         nodes = [{'@type': 'TVEpisode', '@id': page + '#episode', 'url': page, 'episodeNumber': 2,

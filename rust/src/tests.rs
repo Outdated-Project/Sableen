@@ -161,6 +161,11 @@ fn bundled_catalogs_have_unique_ids_and_valid_media() {
         let titles = parse_catalog(data.to_vec()).unwrap();
         assert!(!titles.is_empty());
         for drama in titles {
+            assert!(
+                drama
+                    .episode_count
+                    .is_some_and(|total| total >= drama.episodes.len() as u32)
+            );
             assert!(ids.insert(drama.id));
             for episode in drama.episodes {
                 assert!(episode.url.starts_with("https://hongguoduanju.com/"));

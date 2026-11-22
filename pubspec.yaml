@@ -39,8 +39,6 @@ flutter:
     - assets/catalogs/
     - assets/posters/
     - assets/renditions/
-  shaders:
-    - shaders/capsule.frag
   fonts:
     - family: GoogleSans
       fonts:

@@ -35,10 +35,15 @@ async function test() {
     const renditions = JSON.parse(fs.readFileSync(path.join(root, 'assets/assets/renditions/index.json'), 'utf8'));
     const titles = [['红果短剧', 'hongguo'], ['红果漫剧', 'comic']].map(([label, file]) => {
       const drama = JSON.parse(fs.readFileSync(path.join(root, 'assets/assets/catalogs', file + '.json'), 'utf8')).dramas[0];
-      return [label, drama.title, drama.episodes[0]];
+      return [label, drama.title, drama.episodes[0], drama.episode_count];
     });
     for (const [, title] of titles) await page.getByRole('button', { name: new RegExp(title) }).first().waitFor();
-    for (const [publisher, title, episode] of titles) {
+    const firstRow = await Promise.all(titles.map(([, title]) => page.getByRole('button', { name: new RegExp(title) }).first().boundingBox()));
+    assert(firstRow.every(box => box && box.y >= 0 && box.y + box.height < 780));
+    assert(Math.abs(firstRow[0].y - firstRow[1].y) < 2 && firstRow[0].x < firstRow[1].x);
+    await page.getByRole('button', { name: '切换为单列' }).press('Enter');
+    await page.getByRole('button', { name: '切换为双列' }).press('Enter');
+    for (const [publisher, title, episode, total] of titles) {
       console.log('Testing', publisher, title);
       await page.getByRole('checkbox', { name: publisher }).press('Space');
       await page.getByRole('button', { name: new RegExp(title) }).first().press('Enter');
@@ -46,6 +51,10 @@ async function test() {
         const video = document.querySelector('video');
         return video?.currentTime >= 1 && video.videoWidth > 0;
       }, null, { timeout: 45000 });
+      await page.mouse.move(80, 60);
+      await page.getByRole('button', { name: '选集' }).press('Enter');
+      await page.getByText(`全 ${total} 集 · 当前可播放 `, { exact: false }).first().waitFor();
+      await page.keyboard.press('Escape');
       if (publisher === '红果漫剧' && await page.evaluate(() => document.pictureInPictureEnabled)) {
         await page.mouse.move(80, 80);
         await page.getByRole('button', { name: '小窗播放' }).press('Enter');

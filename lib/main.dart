@@ -13,6 +13,7 @@ import 'src/rust/frb_generated.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  PaintingBinding.instance.imageCache.maximumSizeBytes = 24 * 1024 * 1024;
   runApp(const Sableen());
 }
 

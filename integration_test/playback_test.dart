@@ -103,7 +103,8 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      final filter = find.text(
+      final filter = find.widgetWithText(
+        ChoiceChip,
         source.publishers[id] == Publisher.comic ? '红果漫剧' : '红果短剧',
       );
       await tester.ensureVisible(filter);
