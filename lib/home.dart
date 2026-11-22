@@ -1,10 +1,12 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/rendering.dart' show ScrollCacheExtent;
 import 'package:material_ui/material_ui.dart';
 
 import 'design.dart';
 import 'library.dart';
+import 'offline.dart';
 import 'playback.dart';
 import 'playback_window.dart';
 import 'preferences.dart';
@@ -24,6 +26,7 @@ class _HomeState extends State<Home> {
   Publisher? publisher;
   final search = TextEditingController();
   late Future<List<Drama>> ranked;
+  static final _noChanges = Listenable.merge(const []);
   Library get library => widget.library;
   bool enteringTheater = false;
   @override
@@ -98,7 +101,9 @@ class _HomeState extends State<Home> {
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
-    listenable: library,
+    listenable: tab == 2 && TickerMode.valuesOf(context).enabled
+        ? library
+        : _noChanges,
     builder: (context, _) {
       final names = [
         context.zh('我的剧场', '我的劇場'),
@@ -148,6 +153,9 @@ class _HomeState extends State<Home> {
                             ),
                         child: CustomScrollView(
                           key: PageStorageKey(tab),
+                          scrollCacheExtent: const ScrollCacheExtent.pixels(
+                            160,
+                          ),
                           slivers: [
                             SliverPadding(
                               padding: EdgeInsets.fromLTRB(
@@ -176,6 +184,7 @@ class _HomeState extends State<Home> {
                                             ),
                                       ),
                                     ),
+                                    downloadButton(library.dramas),
                                     IconButton(
                                       tooltip: context.zh('设置', '設定'),
                                       onPressed: () => Navigator.push(
@@ -436,7 +445,7 @@ class _HomeState extends State<Home> {
         itemCount: dramas.length,
         itemBuilder: (context, i) {
           final d = dramas[i],
-              p = library.latest(d.id),
+              p = tab == 2 ? library.latest(d.id) : null,
               c = Theme.of(context).colorScheme;
           final shape = [
             MaterialShapes.arch,
@@ -462,11 +471,24 @@ class _HomeState extends State<Home> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Expanded(
-                    child: Image.asset(
-                      'assets/posters/${origin!.name}-${d.episodes.first.id}.webp',
-                      fit: BoxFit.cover,
-                      cacheWidth: 560,
-                      errorBuilder: (_, _, _) => fallback(),
+                    child: LayoutBuilder(
+                      builder: (context, bounds) {
+                        final pixels =
+                            (bounds.maxWidth *
+                                    MediaQuery.devicePixelRatioOf(context))
+                                .ceil();
+                        return Image(
+                          image: ResizeImage(
+                            AssetImage(
+                              'assets/posters/${origin!.name}-${d.episodes.first.id}.webp',
+                            ),
+                            width: ((pixels + 63) ~/ 64 * 64).clamp(64, 560),
+                            policy: ResizeImagePolicy.fit,
+                          ),
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) => fallback(),
+                        );
+                      },
                     ),
                   ),
                   Padding(

@@ -320,6 +320,9 @@ impl SseDecode for crate::api::library::Episode {
         let mut var_title = <String>::sse_decode(deserializer);
         let mut var_url = <String>::sse_decode(deserializer);
         let mut var_page = <Option<String>>::sse_decode(deserializer);
+        let mut var_bytes = <Option<u32>>::sse_decode(deserializer);
+        let mut var_sha256 = <Option<String>>::sse_decode(deserializer);
+        let mut var_mirrors = <Option<Vec<String>>>::sse_decode(deserializer);
         let mut var_adBreaks =
             <Option<Vec<crate::api::library::AdBreak>>>::sse_decode(deserializer);
         return crate::api::library::Episode {
@@ -327,6 +330,9 @@ impl SseDecode for crate::api::library::Episode {
             title: var_title,
             url: var_url,
             page: var_page,
+            bytes: var_bytes,
+            sha256: var_sha256,
+            mirrors: var_mirrors,
             ad_breaks: var_adBreaks,
         };
     }
@@ -421,6 +427,28 @@ impl SseDecode for Option<String> {
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         if (<bool>::sse_decode(deserializer)) {
             return Some(<String>::sse_decode(deserializer));
+        } else {
+            return None;
+        }
+    }
+}
+
+impl SseDecode for Option<u32> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<u32>::sse_decode(deserializer));
+        } else {
+            return None;
+        }
+    }
+}
+
+impl SseDecode for Option<Vec<String>> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<Vec<String>>::sse_decode(deserializer));
         } else {
             return None;
         }
@@ -587,6 +615,9 @@ impl flutter_rust_bridge::IntoDart for crate::api::library::Episode {
             self.title.into_into_dart().into_dart(),
             self.url.into_into_dart().into_dart(),
             self.page.into_into_dart().into_dart(),
+            self.bytes.into_into_dart().into_dart(),
+            self.sha256.into_into_dart().into_dart(),
+            self.mirrors.into_into_dart().into_dart(),
             self.ad_breaks.into_into_dart().into_dart(),
         ]
         .into_dart()
@@ -672,6 +703,9 @@ impl SseEncode for crate::api::library::Episode {
         <String>::sse_encode(self.title, serializer);
         <String>::sse_encode(self.url, serializer);
         <Option<String>>::sse_encode(self.page, serializer);
+        <Option<u32>>::sse_encode(self.bytes, serializer);
+        <Option<String>>::sse_encode(self.sha256, serializer);
+        <Option<Vec<String>>>::sse_encode(self.mirrors, serializer);
         <Option<Vec<crate::api::library::AdBreak>>>::sse_encode(self.ad_breaks, serializer);
     }
 }
@@ -752,6 +786,26 @@ impl SseEncode for Option<String> {
         <bool>::sse_encode(self.is_some(), serializer);
         if let Some(value) = self {
             <String>::sse_encode(value, serializer);
+        }
+    }
+}
+
+impl SseEncode for Option<u32> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <u32>::sse_encode(value, serializer);
+        }
+    }
+}
+
+impl SseEncode for Option<Vec<String>> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <Vec<String>>::sse_encode(value, serializer);
         }
     }
 }

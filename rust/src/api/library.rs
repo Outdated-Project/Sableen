@@ -19,6 +19,9 @@ pub struct Episode {
     pub title: String,
     pub url: String,
     pub page: Option<String>,
+    pub bytes: Option<u32>,
+    pub sha256: Option<String>,
+    pub mirrors: Option<Vec<String>>,
     pub ad_breaks: Option<Vec<AdBreak>>,
 }
 
@@ -118,6 +121,21 @@ pub fn parse_catalog(bytes: Vec<u8>) -> Result<Vec<Drama>, String> {
                 || !episodes.insert(&ep.id)
                 || !valid_text(&ep.title, 384)
                 || !valid_address(&ep.url)
+                || ep.mirrors.as_ref().is_some_and(|urls| {
+                    urls.len() > 3
+                        || urls.iter().any(|url| !valid_address(url) || url == &ep.url)
+                        || urls.iter().collect::<HashSet<_>>().len() != urls.len()
+                })
+                || match (&ep.sha256, ep.bytes) {
+                    (Some(hash), Some(1..=536_870_912)) => {
+                        hash.len() != 64
+                            || !hash
+                                .bytes()
+                                .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+                    }
+                    (None, None) => false,
+                    _ => true,
+                }
                 || ep.page.as_ref().is_some_and(|page| {
                     !valid_address(page)
                         || (page != &series_page && page != &format!("{series_page}/{}", ep.id))

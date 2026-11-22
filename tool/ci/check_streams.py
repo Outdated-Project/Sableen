@@ -8,7 +8,8 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from refresh_catalogs import HONGGUO, RANKS, ROOT, duration, publication
+from refresh_catalogs import (HONGGUO, RANKS, ROOT, duration, fingerprint, listed_ms,
+                              media_snapshot, public_encodings, publication, published_video)
 
 
 def check(record):
@@ -17,25 +18,37 @@ def check(record):
     if not re.fullmatch(re.escape(HONGGUO) + rf'/player/{re.escape(series)}(?:/{re.escape(episode["id"])})?', page):
         raise ValueError('Invalid player page')
     media = episode['url']
-    if not re.fullmatch(re.escape(HONGGUO) + rf'/video/public/{re.escape(episode["id"])}/\d+p\.mp4', media):
-        raise ValueError(f'Unexpected media origin on {page}')
-    video = next(n for n in publication(page).nodes if n.get('@type') == 'VideoObject'
-                 and n.get('url') == page and n.get('contentUrl') == media and n.get('about', {}).get('@id') == page + '#episode')
-    declared = re.fullmatch(r'PT(?:(\d+)H)?(?:(\d+)M)?(?:([\d.]+)S)?', video.get('duration', ''))
-    listed = round(1000 * sum(float(n or 0) * unit for n, unit in zip(declared.groups(), (3600, 60, 1)))) if declared else 0
-    measured = round(duration(media) * 1000)
+    resolved = published_video(publication(page), series, page)
+    if not resolved or resolved[0] != episode['id']:
+        raise ValueError(f'Published episode or video changed on {page}')
+    item_id, number, video = resolved
+    urls = public_encodings(video, item_id)
+    if media not in urls:
+        raise ValueError(f'Published media changed on {page}')
+    for mirror in episode.get('mirrors', []):
+        if mirror not in urls:
+            raise ValueError(f'Unlisted mirror on {page}')
+        with media_snapshot(mirror) as path:
+            if fingerprint(path)['sha256'] != episode['sha256']:
+                raise ValueError(f'Mirror bytes changed on {page}')
+    listed = listed_ms(video)
+    with media_snapshot(media) as path:
+        if any(episode.get(key) != value for key, value in fingerprint(path).items()):
+            raise ValueError(f'Media bytes changed on {page}')
+        measured = round(duration(path) * 1000)
+        # A plausible header can outlast the decodable video.
+        last_frame = subprocess.check_output([
+            'ffmpeg', '-nostdin', '-v', 'error', '-xerror', '-protocol_whitelist', 'file',
+            '-ss', f'{max(0, measured - 600) / 1000:.3f}', '-f', 'mov', '-i', str(path),
+            '-map', '0:v:0', '-frames:v', '1', '-f', 'framemd5', '-',
+        ], timeout=30, text=True)
     if abs(measured - episode['durationMs']) > 250 or listed != episode['listedMs']:
         raise ValueError(f'Media duration changed on {page}')
-    # The duration in the MP4 header can outlast the decodable video.
-    last_frame = subprocess.check_output([
-        'ffmpeg', '-nostdin', '-v', 'error', '-xerror', '-rw_timeout', '12000000',
-        '-protocol_whitelist', 'https,tls,tcp', '-ss', f'{max(0, measured - 600) / 1000:.3f}',
-        '-i', media, '-map', '0:v:0', '-frames:v', '1', '-f', 'framemd5', '-',
-    ], timeout=30, text=True)
     if not any(row.startswith('0,') for row in last_frame.splitlines()):
         raise ValueError(f'Cannot decode video near the declared end of {page}')
     full = listed > 0 and abs(listed - measured) <= 1000
-    if ('片段' in episode['title']) == full:
+    expected = f'第{number}集' + ('' if full else f' · {round(measured / 1000)} 秒片段')
+    if episode['title'] != expected:
         raise ValueError(f'Incorrect preview label on {page}')
     return full
 

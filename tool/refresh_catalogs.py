@@ -1,10 +1,14 @@
 import concurrent.futures
+from contextlib import contextmanager
+import hashlib
 import json
 import math
 import os
 import re
 import subprocess
 import tempfile
+import time
+from urllib.parse import urlsplit
 from html.parser import HTMLParser
 from pathlib import Path
 
@@ -18,6 +22,7 @@ class Publication(HTMLParser):
     def __init__(self, page):
         super().__init__(convert_charrefs=True)
         self.nodes = []
+        self.public_video = {}
         self.script_type = None
         self.feed(page)
         self.close()
@@ -35,36 +40,118 @@ class Publication(HTMLParser):
         if self.script_type == 'application/ld+json':
             obj = json.loads(data)
             self.nodes.extend(obj.get('@graph', [obj]))
+        elif self.script_type == '' and data.lstrip().startswith('_ROUTER_DATA = '):
+            state, _ = json.JSONDecoder().raw_decode(data.lstrip()[len('_ROUTER_DATA = '):])
+            for route in state.get('loaderData', {}).values():
+                if isinstance(route, dict) and isinstance(route.get('publicVideoSeo'), dict):
+                    self.public_video = route['publicVideoSeo']
 
 
 def get(url):
-    result = subprocess.run(['curl', '--silent', '--show-error', '--max-time', '20',
-                             '--retry', '1', '--max-filesize', '2097152', '--proto', '=https',
-                             '--write-out', '\n%{http_code}', '--', url],
-                            capture_output=True, check=True, timeout=50)
-    body, status = result.stdout.rsplit(b'\n', 1)
-    if status in (b'404', b'410') or status.startswith(b'3'):
-        return ''
-    if status != b'200':
-        raise ValueError(f'{url} returned HTTP {status.decode()}')
-    return body.decode('utf-8')
+    for attempt in range(2):
+        result = subprocess.run(['curl', '--silent', '--show-error', '--max-time', '20',
+                                 '--retry', '1', '--max-filesize', '2097152', '--proto', '=https',
+                                 '--write-out', '\n%{http_code}', '--', url],
+                                capture_output=True, check=True, timeout=50)
+        body, status = result.stdout.rsplit(b'\n', 1)
+        if status in (b'404', b'410') or status.startswith(b'3'):
+            return ''
+        if status != b'200':
+            raise ValueError(f'{url} returned HTTP {status.decode()}')
+        if body.strip():
+            return body.decode('utf-8')
+        if attempt == 0:
+            time.sleep(0.4)
+    raise ValueError(f'Empty publication at {url}')
 
 
 def publication(url):
     return Publication(get(url))
 
 
-def duration(url, container='mov'):
-    result = subprocess.run(['ffprobe', '-v', 'error', '-rw_timeout', '12000000',
-                             '-protocol_whitelist', 'https,tls,tcp,crypto', '-f', container,
+@contextmanager
+def media_snapshot(url):
+    with tempfile.TemporaryDirectory() as folder:
+        path = Path(folder) / 'episode.mp4'
+        subprocess.run(['curl', '--fail', '--silent', '--show-error', '--max-time', '90',
+                        '--retry', '1', '--max-filesize', '536870912', '--proto', '=https',
+                        '--output', str(path), '--', url], check=True, timeout=190)
+        yield path
+
+
+def fingerprint(path):
+    digest = hashlib.sha256()
+    with path.open('rb') as stream:
+        for chunk in iter(lambda: stream.read(1 << 20), b''):
+            digest.update(chunk)
+    return {'bytes': path.stat().st_size, 'sha256': digest.hexdigest()}
+
+
+def duration(path):
+    result = subprocess.run(['ffprobe', '-v', 'error', '-protocol_whitelist', 'file', '-f', 'mov',
                              '-select_streams', 'v:0', '-show_entries',
-                             'stream=codec_name:format=duration', '-of', 'json', url],
+                             'stream=codec_name:format=duration', '-of', 'json', str(path)],
                             capture_output=True, check=True, timeout=25)
     probe = json.loads(result.stdout)
     seconds = float(probe['format']['duration'])
     if not probe['streams'] or not math.isfinite(seconds) or seconds <= 0:
-        raise ValueError(f'Invalid video at {url}')
+        raise ValueError(f'Invalid video at {path}')
     return seconds
+
+
+def published_video(doc, series_id, page):
+    """Follow the public season → episode → video links for this exact player page."""
+    base = f'{HONGGUO}/player/{series_id}'
+    match = re.fullmatch(re.escape(base) + r'(?:/(\d+))?', page)
+    if not match:
+        return None
+    detail = f'{HONGGUO}/detail?series_id={series_id}'
+    episode = next((n for n in doc.nodes if n.get('@type') == 'TVEpisode' and n.get('url') == page
+                    and n.get('@id') == page + '#episode' and (
+                        n.get('partOfSeason', {}).get('@id') == detail + '#season' or
+                        n.get('partOfSeries', {}).get('@id') == detail + '#series')), None)
+    if not episode or not episode.get('video', {}).get('@id'):
+        return None
+    video = next((n for n in doc.nodes if n.get('@type') == 'VideoObject' and n.get('url') == page
+                  and n.get('@id') == episode['video']['@id'] and n.get('about', {}).get('@id') == episode['@id']), None)
+    if not video or not video.get('contentUrl'):
+        return None
+    uri = urlsplit(video['contentUrl'])
+    if (uri.scheme != 'https' or uri.netloc != urlsplit(HONGGUO).netloc or not uri.path.endswith('.mp4')
+            or uri.fragment or uri.query or not video['contentUrl'].isascii() or '\\' in video['contentUrl']):
+        return None
+    ids = {match[1]} if match[1] else set()
+    public = doc.public_video
+    if public:
+        if public.get('available') is not True or str(public.get('seriesId')) != series_id:
+            return None
+        ids.add(str(public.get('itemId')))
+    canonical = re.fullmatch(r'/video/public/(\d+)/\d+p\.mp4', uri.path)
+    if canonical:
+        ids.add(canonical[1])
+    if len(ids) != 1 or not re.fullmatch(r'[0-9]+', item_id := ids.pop()):
+        return None
+    return item_id, episode['episodeNumber'], video
+
+
+def public_encodings(video, item_id):
+    urls = [video['contentUrl']]
+    entries = video.get('encoding') or []
+    for entry in entries if isinstance(entries, list) else [entries]:
+        if not isinstance(entry, dict):
+            continue
+        url = entry.get('contentUrl')
+        if not isinstance(url, str) or not re.fullmatch(re.escape(HONGGUO) + r'/[\w./%-]+\.mp4', url, flags=re.ASCII):
+            continue
+        canonical = re.fullmatch(r'/video/public/(\d+)/\d+p\.mp4', urlsplit(url).path)
+        if (not canonical or canonical[1] == item_id) and url not in urls:
+            urls.append(url)
+    return urls
+
+
+def listed_ms(video):
+    declared = re.fullmatch(r'PT(?:(\d+)H)?(?:(\d+)M)?(?:([\d.]+)S)?', video.get('duration', ''))
+    return round(1000 * sum(float(v or 0) * unit for v, unit in zip(declared.groups(), (3600, 60, 1)))) if declared else 0
 
 
 def hongguo_title(item):
@@ -84,23 +171,33 @@ def hongguo_title(item):
         page = entry['url']
         if not re.fullmatch(re.escape(f'{HONGGUO}/player/{series_id}') + r'(?:/\d+)?', page):
             continue
-        video = next((n for n in publication(page).nodes if n.get('@type') == 'VideoObject'
-                      and n.get('url') == page and n.get('about', {}).get('@id') == entry['@id']), None)
-        if not video:
+        resolved = published_video(publication(page), series_id, page)
+        if not resolved:
             continue
-        media = video.get('contentUrl', '')
-        match = re.fullmatch(re.escape(HONGGUO) + r'/video/public/(\d+)/\d+p\.mp4', media)
-        if not match or match[1] in used:
+        item_id, number, video = resolved
+        if item_id in used or number != entry['episodeNumber'] or entry['@id'] != page + '#episode':
             continue
-        actual = duration(media)
-        label = f"第{entry['episodeNumber']}集"
-        declared = re.fullmatch(r'PT(?:(\d+)H)?(?:(\d+)M)?(?:([\d.]+)S)?', video.get('duration', ''))
-        total = sum(float(v or 0) * unit for v, unit in zip(declared.groups(), (3600, 60, 1))) if declared else 0
-        if not total or abs(actual - total) > 1:
-            label += f' · {round(actual)} 秒片段'
-        episodes.append({'id': match[1], 'title': label, 'url': media, 'page': page,
-                         'durationMs': round(actual * 1000), 'listedMs': round(total * 1000)})
-        used.add(match[1])
+        total = listed_ms(video)
+        verified = []
+        for url in public_encodings(video, item_id):
+            try:
+                with media_snapshot(url) as path:
+                    actual = round(duration(path) * 1000)
+                    verified.append((url, actual, fingerprint(path)))
+            except (subprocess.SubprocessError, ValueError, KeyError) as error:
+                print(f'Unavailable published media on {page}: {error}', flush=True)
+        if not verified:
+            raise ValueError(f'No usable published media on {page}')
+        # Prefer a duration-matched publication, retaining publisher order on ties.
+        media, actual, evidence = max(verified, key=lambda v: bool(total) and abs(v[1] - total) <= 1000)
+        mirrors = [url for url, _, other in verified if url != media and other == evidence][:3]
+        label = f'第{number}集'
+        if not total or abs(actual - total) > 1000:
+            label += f' · {round(actual / 1000)} 秒片段'
+        episodes.append({'id': item_id, 'title': label, 'url': media, 'page': page,
+                         'durationMs': actual, 'listedMs': total, **evidence,
+                         **({'mirrors': mirrors} if mirrors else {})})
+        used.add(item_id)
         tags.extend(video.get('genre') or [])
     if episodes:
         return {'id': series_id, 'title': series['name'], 'tags': list(dict.fromkeys(tags)) or ['短剧'],
@@ -119,27 +216,43 @@ def save(name, dramas):
     print(f'{name}: {len(dramas)} titles, {sum(len(d["episodes"]) for d in dramas)} videos')
 
 
-def poster(record):
-    publisher, drama = record
+def encode_poster(args, image=None):
+    encoder = ['-frames:v', '1', '-an', '-vf', 'scale=560:560:force_original_aspect_ratio=decrease',
+               '-c:v', 'libwebp', '-quality', '78', '-f', 'image2pipe', 'pipe:1']
+    ffmpeg = ['ffmpeg', '-nostdin', '-loglevel', 'error']
+    encoded = subprocess.run(ffmpeg + args + encoder, input=image, capture_output=True,
+                             check=True, timeout=20).stdout
+    if encoded[:4] != b'RIFF' or encoded[8:12] != b'WEBP':
+        raise ValueError('Invalid WebP output')
+    return encoded
+
+
+def cover_image(url):
+    if not url or not re.fullmatch(r'https://p\d+-novel(?:-seo)?\.byteimg\.com/[^\s]+', url):
+        raise ValueError('No supported publisher cover')
+    image = subprocess.run(['curl', '-fsS', '--max-time', '15', '--retry', '1', '--max-filesize',
+                            '8388608', '--proto', '=https', '--', url],
+                           capture_output=True, check=True, timeout=40).stdout
+    args = ['-protocol_whitelist', 'pipe', '-max_pixels', '25000000', '-i', 'pipe:0']
+    return encode_poster(args, image)
+
+
+def poster(publisher, drama, primary):
     first = drama['episodes'][0]
-    if not re.fullmatch(r'[A-Za-z0-9_-]+', first['id']):
+    if not re.fullmatch(r'[0-9]+', first['id']):
         raise ValueError('Invalid poster ID')
     folder = ROOT.parent / 'posters'
     folder.mkdir(parents=True, exist_ok=True)
     target = folder / f"{publisher}-{first['id']}.webp"
-    encoder = ['-frames:v', '1', '-an', '-vf', 'scale=560:560:force_original_aspect_ratio=decrease',
-               '-c:v', 'libwebp', '-quality', '78', '-f', 'image2pipe', 'pipe:1']
-    ffmpeg = ['ffmpeg', '-nostdin', '-loglevel', 'error']
-    if not re.fullmatch(r'https://p\d+-novel(?:-seo)?\.byteimg\.com/[^\s]+', drama['cover']):
-        raise ValueError('Unexpected Hongguo poster host')
-    image = subprocess.run(['curl', '-fsS', '--max-time', '15', '--retry', '1', '--max-filesize',
-                            '8388608', '--proto', '=https', '--', drama['cover']],
-                           capture_output=True, check=True, timeout=40).stdout
-    args = ['-protocol_whitelist', 'pipe', '-max_pixels', '25000000', '-i', 'pipe:0']
-    encoded = subprocess.run(ffmpeg + args + encoder, input=image, capture_output=True,
-                             check=True, timeout=40).stdout
-    if encoded[:4] != b'RIFF' or encoded[8:12] != b'WEBP':
-        raise ValueError(f'Invalid poster for {first["id"]}')
+    try:
+        encoded = primary.result()
+    except (ValueError, subprocess.SubprocessError):
+        # A missing cover can use a frame from this exact verified episode.
+        with media_snapshot(first['url']) as path:
+            if fingerprint(path)['sha256'] != first['sha256']:
+                raise ValueError(f'Media changed while generating {target.name}')
+            encoded = encode_poster(['-protocol_whitelist', 'file', '-max_pixels', '25000000',
+                                     '-f', 'mov', '-i', str(path)])
     with tempfile.NamedTemporaryFile(dir=folder, delete=False) as tmp:
         tmp.write(encoded)
     os.replace(tmp.name, target)
@@ -147,12 +260,22 @@ def poster(record):
 
 def main():
     covers = set()
-    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
+    with (concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool,
+          concurrent.futures.ThreadPoolExecutor(max_workers=2) as images):
         for category, slug in RANKS.items():
             rank = publication(f'{HONGGUO}/rank/{slug}')
             items = next(n['itemListElement'] for n in rank.nodes if n.get('@type') == 'ItemList')
-            titles = [d for d in pool.map(hongguo_title, items) if d]
-            list(pool.map(poster, ((category, d) for d in titles)))
+            titles, pending, primary = [], [], {}
+            for drama in pool.map(hongguo_title, items):
+                if drama is None:
+                    continue
+                titles.append(drama)
+                url = drama.get('cover')
+                if url not in primary:
+                    primary[url] = images.submit(cover_image, url)
+                pending.append(images.submit(poster, category, drama, primary[url]))
+            for future in pending:
+                future.result()
             save(category, titles)
             covers.update(f"{category}-{d['episodes'][0]['id']}.webp" for d in titles)
     for category in RANKS:

@@ -109,6 +109,9 @@ class Episode {
   final String title;
   final String url;
   final String? page;
+  final int? bytes;
+  final String? sha256;
+  final List<String>? mirrors;
   final List<AdBreak>? adBreaks;
 
   const Episode({
@@ -116,6 +119,9 @@ class Episode {
     required this.title,
     required this.url,
     this.page,
+    this.bytes,
+    this.sha256,
+    this.mirrors,
     this.adBreaks,
   });
 
@@ -125,6 +131,9 @@ class Episode {
       title.hashCode ^
       url.hashCode ^
       page.hashCode ^
+      bytes.hashCode ^
+      sha256.hashCode ^
+      mirrors.hashCode ^
       adBreaks.hashCode;
 
   @override
@@ -136,6 +145,9 @@ class Episode {
           title == other.title &&
           url == other.url &&
           page == other.page &&
+          bytes == other.bytes &&
+          sha256 == other.sha256 &&
+          mirrors == other.mirrors &&
           adBreaks == other.adBreaks;
 }
 

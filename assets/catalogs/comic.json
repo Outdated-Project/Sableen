@@ -18,7 +18,9 @@
           "url": "https://hongguoduanju.com/video/public/7708355470964050969/360p.mp4",
           "page": "https://hongguoduanju.com/player/7708355462780947518",
           "durationMs": 10067,
-          "listedMs": 115000
+          "listedMs": 115000,
+          "bytes": 846745,
+          "sha256": "3ce4f77bba0913c1374add96d3ed34dcd24d37ae2c335a2a55a8027ab80903ec"
         }
       ]
     },
@@ -39,7 +41,9 @@
           "url": "https://hongguoduanju.com/video/public/7697465535398677529/360p.mp4",
           "page": "https://hongguoduanju.com/player/7697459724635098174",
           "durationMs": 10067,
-          "listedMs": 88000
+          "listedMs": 88000,
+          "bytes": 1316197,
+          "sha256": "b69042ba7df8a8a8c6609c54f526d89e81fca01c3f7f5c809499c9362cdbc536"
         }
       ]
     },
@@ -59,7 +63,9 @@
           "url": "https://hongguoduanju.com/video/public/7698309376561400856/360p.mp4",
           "page": "https://hongguoduanju.com/player/7698294694886788121",
           "durationMs": 10067,
-          "listedMs": 143000
+          "listedMs": 143000,
+          "bytes": 1680490,
+          "sha256": "aed20dff18ee8fc97c7c405bd04f037602e48f7a2857314762ff44f98b4c1886"
         }
       ]
     },
@@ -80,7 +86,9 @@
           "url": "https://hongguoduanju.com/video/public/7708636298579282968/360p.mp4",
           "page": "https://hongguoduanju.com/player/7708636291356691481",
           "durationMs": 10067,
-          "listedMs": 174000
+          "listedMs": 174000,
+          "bytes": 484112,
+          "sha256": "32c600f7d6b0c35435076f4b948053c0d5ed670b0c543425186194a2526b9883"
         }
       ]
     },
@@ -100,7 +108,9 @@
           "url": "https://hongguoduanju.com/video/public/7707995750931647512/360p.mp4",
           "page": "https://hongguoduanju.com/player/7707995743465786430",
           "durationMs": 10067,
-          "listedMs": 171000
+          "listedMs": 171000,
+          "bytes": 1408703,
+          "sha256": "5f364b778e171eacc25d8e64c7f505765beff8592368d286b47fe65a8286f10e"
         }
       ]
     },
@@ -121,7 +131,9 @@
           "url": "https://hongguoduanju.com/video/public/7705860547983445016/360p.mp4",
           "page": "https://hongguoduanju.com/player/7705860541771697176",
           "durationMs": 10067,
-          "listedMs": 145000
+          "listedMs": 145000,
+          "bytes": 1053866,
+          "sha256": "5c91d9556ade254306a714629c93d94cdaad05f8fbbdf858aa96e0bb067c2023"
         }
       ]
     },
@@ -140,7 +152,9 @@
           "url": "https://hongguoduanju.com/video/public/7708293937412197400/360p.mp4",
           "page": "https://hongguoduanju.com/player/7708293931498228798",
           "durationMs": 10067,
-          "listedMs": 120000
+          "listedMs": 120000,
+          "bytes": 934490,
+          "sha256": "7332a1d5b74f85afd798ee89400b5988e46ec905704bee51c7a8a7d657f52b28"
         }
       ]
     },
@@ -159,7 +173,9 @@
           "url": "https://hongguoduanju.com/video/public/7706890408759938072/360p.mp4",
           "page": "https://hongguoduanju.com/player/7706890402913078297",
           "durationMs": 10067,
-          "listedMs": 71000
+          "listedMs": 71000,
+          "bytes": 1148054,
+          "sha256": "c2bbba0fcdf0d1a9e5e7f9fd9b3e380c2d6ff9024a798c8e275613e26919adb4"
         }
       ]
     },
@@ -180,7 +196,9 @@
           "url": "https://hongguoduanju.com/video/public/7705418651033160728/360p.mp4",
           "page": "https://hongguoduanju.com/player/7705418643252726809",
           "durationMs": 10067,
-          "listedMs": 195000
+          "listedMs": 195000,
+          "bytes": 547543,
+          "sha256": "5ec947082289559af13252e3c788553d9c6e6706fca0d8cf6a122da31a9374f3"
         }
       ]
     },
@@ -200,7 +218,9 @@
           "url": "https://hongguoduanju.com/video/public/7707659634571480089/360p.mp4",
           "page": "https://hongguoduanju.com/player/7707659627189521470",
           "durationMs": 10067,
-          "listedMs": 69000
+          "listedMs": 69000,
+          "bytes": 742888,
+          "sha256": "b6464d437187e90941727fbb16956d553bf551cabac45cd7d8b7ab397c3efa64"
         }
       ]
     },
@@ -221,7 +241,9 @@
           "url": "https://hongguoduanju.com/video/public/7703065456646556696/360p.mp4",
           "page": "https://hongguoduanju.com/player/7703065438208412697",
           "durationMs": 10067,
-          "listedMs": 190000
+          "listedMs": 190000,
+          "bytes": 1220822,
+          "sha256": "db3588d381b0ea0fef830f4fbf61253a7de9f116bfd852c82cd7a534043344cc"
         }
       ]
     },
@@ -242,7 +264,9 @@
           "url": "https://hongguoduanju.com/video/public/7706112726304558105/360p.mp4",
           "page": "https://hongguoduanju.com/player/7706110640078736408",
           "durationMs": 10067,
-          "listedMs": 154000
+          "listedMs": 154000,
+          "bytes": 787729,
+          "sha256": "c08d9168cefe487cf4ba80fb0b74f422ad465454e8307f73470e2740b94da813"
         }
       ]
     },
@@ -263,7 +287,9 @@
           "url": "https://hongguoduanju.com/video/public/7706541923128839192/360p.mp4",
           "page": "https://hongguoduanju.com/player/7706541916665416729",
           "durationMs": 10067,
-          "listedMs": 152000
+          "listedMs": 152000,
+          "bytes": 820196,
+          "sha256": "9e1c7302039facab597356a3e75237c75e871e7e8bc4a472d31bfeb03636d186"
         }
       ]
     },
@@ -284,7 +310,9 @@
           "url": "https://hongguoduanju.com/video/public/7708716873361132568/360p.mp4",
           "page": "https://hongguoduanju.com/player/7708716865396165657",
           "durationMs": 10067,
-          "listedMs": 190000
+          "listedMs": 190000,
+          "bytes": 746139,
+          "sha256": "8b975acda66c24040a32cd4d00cb72378ef9fd525bc3b4a741cfe475fb0f6682"
         }
       ]
     },
@@ -305,7 +333,9 @@
           "url": "https://hongguoduanju.com/video/public/7702764976515075096/360p.mp4",
           "page": "https://hongguoduanju.com/player/7702763145030290457",
           "durationMs": 10067,
-          "listedMs": 89000
+          "listedMs": 89000,
+          "bytes": 648281,
+          "sha256": "6ec575f318b88e847501f83834192e64ee495fa7145a48f7651ea5bafb7f3b5a"
         }
       ]
     },
@@ -324,7 +354,9 @@
           "url": "https://hongguoduanju.com/video/public/7704150439247236120/360p.mp4",
           "page": "https://hongguoduanju.com/player/7704150431571643454",
           "durationMs": 10067,
-          "listedMs": 168000
+          "listedMs": 168000,
+          "bytes": 764001,
+          "sha256": "f7856819bc23439eb2dbaad2ef7a1d45acccf3d405e7649cac0882d6a5b8680d"
         }
       ]
     },
@@ -344,7 +376,9 @@
           "url": "https://hongguoduanju.com/video/public/7706924800089787416/360p.mp4",
           "page": "https://hongguoduanju.com/player/7706924793131437080",
           "durationMs": 10067,
-          "listedMs": 62000
+          "listedMs": 62000,
+          "bytes": 1496178,
+          "sha256": "a0b8ddb22532b8efde876f245d8a38600dd92cdc211b12e1246fb966b597bc4e"
         }
       ]
     },
@@ -365,7 +399,9 @@
           "url": "https://hongguoduanju.com/video/public/7704261238552792088/360p.mp4",
           "page": "https://hongguoduanju.com/player/7704261228037671998",
           "durationMs": 10067,
-          "listedMs": 138000
+          "listedMs": 138000,
+          "bytes": 1501772,
+          "sha256": "cf45b4efe85c3eb792ef25e15ced535921162a1e56b00274b01f58f2e5f0e004"
         }
       ]
     },
@@ -385,7 +421,9 @@
           "url": "https://hongguoduanju.com/video/public/7706084784115567640/360p.mp4",
           "page": "https://hongguoduanju.com/player/7705064563355421720",
           "durationMs": 10067,
-          "listedMs": 199000
+          "listedMs": 199000,
+          "bytes": 1364347,
+          "sha256": "4c67cb46c37fd054eb7510ba8b7c4eac5be3938c7465901e177b5b1739ccfeb9"
         }
       ]
     },
@@ -406,7 +444,9 @@
           "url": "https://hongguoduanju.com/video/public/7703566063207730200/360p.mp4",
           "page": "https://hongguoduanju.com/player/7703566055800589374",
           "durationMs": 10067,
-          "listedMs": 126000
+          "listedMs": 126000,
+          "bytes": 1008193,
+          "sha256": "8cbde8dfcea612e9ab27a3e57824c592111481ee9f04607c2d7318583698ed8e"
         }
       ]
     }

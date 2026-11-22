@@ -15,6 +15,14 @@ The refresh tool follows chart entries to individual episodes, matches the publi
 
 ## Playback
 
+On Android, a **西饭** button appears for previews and playback errors. It opens the installed Xifan app, where viewers can search by title. A cross-platform Xifan episode link has yet to be verified. Episode selection and progress remain specific to each app.
+
+### Offline downloads
+
+Open the download panel in a native player to save the selected episode or preview. The home screen also exposes the queue, including pause-all and resume-all controls. Reopening a saved title plays the local copy. Web playback streams online. Transfers run in the app process. After a restart, users can enqueue unfinished episodes again.
+
+The queue uses the published MP4 URL and resolves the system proxy. It transfers at most two episodes concurrently and can split files of at least 1 MiB into two byte ranges, for up to four concurrent segments. Transient network failures receive bounded retries. Progress notifications are coalesced over 250 ms. Each transfer uses its own working directory. The app checks the byte count and SHA-256 from the bundled catalog before committing the file and marking it as saved. The 40 currently bundled videos retain their measured preview lengths offline.
+
 Opening a title enters fullscreen. Tap the center to pause or resume. The controls hide after three seconds of playback. Tap an edge or move the pointer to bring them back. Hiding the app pauses playback. Losing focus while the window remains visible allows playback to continue. Supported Android devices and browsers with the standard Picture-in-Picture API expose a button for pop-out playback.
 
 Each theater owns one player and releases it on exit. It requests hardware decoding. Android requests a compatible refresh rate at the current resolution when the video declares its frame rate. The OS and driver choose the actual mode. The timeline updates independently of the video surface. Theme settings offer solid, blurred, refractive and Aero-style navigation materials.

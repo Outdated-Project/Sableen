@@ -10,6 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'design.dart';
 import 'library.dart';
+import 'offline.dart';
 import 'playback_window.dart';
 import 'src/rust/api/library.dart';
 
@@ -96,7 +97,7 @@ class _TheaterState extends State<Theater> with WidgetsBindingObserver {
     player = Player(
       configuration: const PlayerConfiguration(
         bufferSize: 16 * 1024 * 1024,
-        protocolWhitelist: ['https', 'tcp', 'tls', 'crypto'],
+        protocolWhitelist: ['https', 'tcp', 'tls', 'crypto', 'file'],
       ),
     );
     video = VideoController(
@@ -214,9 +215,11 @@ class _TheaterState extends State<Theater> with WidgetsBindingObserver {
     _cadence();
     _update();
     try {
+      final local = kIsWeb ? null : await offlinePath(episode);
+      if (closed) return;
       await player.open(
         Media(
-          episode.url,
+          local ?? episode.url,
           start: !kIsWeb && previous > 0
               ? Duration(milliseconds: previous)
               : null,
@@ -543,6 +546,33 @@ class _TheaterState extends State<Theater> with WidgetsBindingObserver {
                               icon: const Icon(Icons.arrow_back_rounded),
                             ),
                             const Spacer(),
+                            downloadButton(
+                              widget.library.dramas,
+                              drama: widget.drama,
+                              episode: episode,
+                            ),
+                            if (androidVideo &&
+                                (failed || episode.title.contains('片段')))
+                              TextButton.icon(
+                                onPressed: () async {
+                                  final opened = await displayChannel
+                                      .invokeMethod<bool>('openXifan');
+                                  if (context.mounted && opened != true) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          context.zh(
+                                            '此设备未能打开西饭短剧',
+                                            '此裝置未能開啟西飯短劇',
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                },
+                                icon: const Icon(Icons.open_in_new),
+                                label: Text(context.zh('西饭', '西飯')),
+                              ),
                             if (supportsPip)
                               IconButton.filledTonal(
                                 tooltip: context.zh('小窗播放', '小窗播放'),

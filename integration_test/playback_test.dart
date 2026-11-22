@@ -8,6 +8,7 @@ import 'package:media_kit_video/media_kit_video.dart';
 import 'package:sableen/design.dart';
 import 'package:sableen/home.dart';
 import 'package:sableen/library.dart';
+import 'package:sableen/offline.dart';
 import 'package:sableen/playback.dart';
 import 'package:sableen/preferences.dart';
 import 'package:sableen/src/rust/frb_generated.dart';
@@ -172,6 +173,36 @@ void main() {
         );
       }
       await tester.pump();
+      final episode = library.byId[id]!.episodes.first;
+      final hadCopy = await offlinePath(episode) != null;
+      if (!hadCopy) {
+        addTearDown(() async {
+          final path = await offlinePath(episode);
+          if (path != null) await File(path).delete();
+        });
+      }
+      await tester.tap(find.byTooltip('离线下载').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('下载 ${episode.title}'));
+      await until('Verified download failed', () {
+        final errors = find.textContaining('下载失败');
+        if (errors.evaluate().isNotEmpty) {
+          fail(tester.widget<Text>(errors.first).data!);
+        }
+        return find.text('已保存').evaluate().isNotEmpty &&
+            find
+                .widgetWithText(
+                  ListTile,
+                  '${library.byId[id]!.title} · ${episode.title}',
+                )
+                .evaluate()
+                .any(
+                  (e) =>
+                      ((e.widget as ListTile).subtitle as Text?)?.data == '已保存',
+                );
+      });
+      Navigator.of(tester.element(find.text('下载 ${episode.title}'))).pop();
+      await tester.pumpAndSettle();
       final slider = tester.widget<Slider>(find.byType(Slider));
       // Leave time to measure playback after restoring even a short preview.
       final target = (slider.max * .65).round();
@@ -199,6 +230,10 @@ void main() {
         () => player().state.position.inMilliseconds > 0,
       );
       final firstPosition = player().state.position.inMilliseconds;
+      expect(
+        player().state.playlist.medias.single.uri,
+        endsWith('${episode.sha256}.mp4'),
+      );
       expect(
         firstPosition,
         closeTo(progress.positionMs, 900),
