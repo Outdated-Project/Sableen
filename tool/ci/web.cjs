@@ -66,9 +66,13 @@ async function test() {
       }, null, { timeout: 45000 });
       await page.mouse.move(80, 60);
       await page.getByRole('button', { name: '选集' }).press('Enter');
-      await page.getByText(`全 ${total} 集 · 正片 `, { exact: false }).first().waitFor();
+      await page.getByRole('button', {name: '1–15', exact: true}).waitFor();
+      assert((await page.locator('body').ariaSnapshot()).includes(`全 ${total} 集`));
       await page.keyboard.press('Escape');
       let saved = episode;
+      await page.getByRole('button', { name: '1×', exact:true }).press('Enter');
+      await page.getByText('1.25×', {exact: true}).last().click();
+      await page.waitForFunction(() => document.querySelector('video')?.playbackRate === 1.25);
       if (publisher === '红果漫剧' && await page.evaluate(() => document.pictureInPictureEnabled)) {
         await page.mouse.move(80, 80);
         await page.getByRole('button', { name: '小窗播放' }).press('Enter');

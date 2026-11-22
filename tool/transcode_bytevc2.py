@@ -10,7 +10,7 @@ import subprocess
 import tempfile
 import time
 
-from refresh_catalogs import fingerprint, media_snapshot
+from refresh_catalogs import COMPATIBILITY_CODECS, fingerprint, media_snapshot
 
 
 def probe(executable, path):
@@ -69,15 +69,15 @@ def verify(ffmpeg, ffprobe, src, out, original):
             **fingerprint(out)}
 
 
-def prepare_rendition(url, evidence, folder):
+def prepare_rendition(url, evidence, folder, tag='bvc2'):
     folder.mkdir(exist_ok=True)
     ffmpeg = os.environ.get('SABLEEN_FFMPEG', 'ffmpeg')
     ffprobe = os.environ.get('SABLEEN_FFPROBE', 'ffprobe')
     with media_snapshot(url) as src, tempfile.TemporaryDirectory(dir=folder) as work:
         if fingerprint(src) != evidence:
-            raise ValueError('ByteVC2 source changed before conversion')
+            raise ValueError('Video source changed before conversion')
         original = probe(ffprobe, src)
-        check_source(original[0])
+        check_source(original[0], tag)
         out = Path(work) / 'episode.mp4'
         convert(ffmpeg, src, out, 'veryfast', original[1])
         result = verify(ffmpeg, ffprobe, src, out, original)
@@ -85,9 +85,9 @@ def prepare_rendition(url, evidence, folder):
         return {k: result[k] for k in ('bytes', 'sha256')}
 
 
-def check_source(video):
-    if video.get('codec_tag_string') != 'bvc2' or video.get('codec_name') != 'bvc2':
-        raise ValueError('Expected a ByteVC2 input and an ffprobe build with its decoder')
+def check_source(video, tag='bvc2'):
+    if tag not in COMPATIBILITY_CODECS or video.get('codec_tag_string') != tag or video.get('codec_name') != COMPATIBILITY_CODECS[tag]:
+        raise ValueError(f'Expected a {tag} input and an ffprobe build with its decoder')
     if video.get('color_transfer') in ('smpte2084', 'arib-std-b67'):
         raise ValueError('HDR input requires a colour-managed HDR conversion')
 

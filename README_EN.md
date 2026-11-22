@@ -33,7 +33,11 @@ The theater opens in two columns and remembers the layout selected beside the ti
 
 A Windows profile build scrolled through 40 titles at `1264 × 681`. Aero recorded 363 frames with P95 build and raster times of 1.98 ms and 3.98 ms. Liquid recorded 364 frames at 1.82 ms and 3.72 ms respectively. The Flutter image cache peaked at 2.26 MiB in both runs. Peak process working sets were 194.6 MiB and 201.4 MiB respectively.
 
-Opening a title enters fullscreen. Tap the center to pause or continue, or tap the edge to reveal the controls. The episode picker shows every published episode number, the duration of available previews and which numbers lack media. The player shows decoded dimensions. When a catalog provides multiple verified resolutions, selecting another file keeps the playback position and play or pause state. Downloads use the selected file. Native players also support switching between video tracks of different sizes within one file. Phones return to portrait after playback. Tablets and desktop windows retain their orientation. Visible windows can keep playing while unfocused. Hiding the app pauses playback. Supported Android devices and browsers offer picture-in-picture.
+Opening a title enters fullscreen. Tap the center to pause or continue, or tap the edge to reveal the controls. The episode picker lists every published episode number and the duration of available previews. “本应用尚未收录” means the app’s current catalog has no verified file for that episode. Tap the decoded dimensions to see the available resolutions. Switching between files preserves the playback position and play or pause state. Downloads use the selected file. Native players also list video tracks within the current file alongside separate files. Phones return to portrait after playback. Tablets and desktop windows retain their orientation. Visible windows can keep playing while unfocused. Hiding the app pauses playback. Supported Android devices and browsers offer picture-in-picture.
+
+For long series, tap the episode range to jump between groups of 15. The player offers six playback speeds from 0.5× to 2×.
+
+In fresh desktop Chrome sessions, the official 785-episode picker for 《全球死考：刚下刑场你让我去考试一季》 played episodes 2 and 5 without signing in. Continuous frame measurements reached 170.53 and 101.10 seconds respectively, both at 640 × 360. Selecting episode 6 showed a prompt to continue in the official app. The Sableen catalog currently includes the first episode’s preview for this series. [Official episode 2](https://hongguoduanju.com/player/7697459724635098174/7697465811157404697)
 
 Recommendations use time spent watching each genre, with a 21-day half-life. Seeking and buffering add no viewing time. Search, preferences and history stay on the device. Viewing requires no Sableen account.
 
@@ -76,7 +80,7 @@ flutter test integration_test/playback_test.dart -d windows
 python tool/ci/check_streams.py --require-episodes --report source-measurements.json
 ```
 
-Refresh the publisher-linked catalog and posters with `python tool/refresh_catalogs.py`. Set `SABLEEN_FFMPEG` and `SABLEEN_FFPROBE` to ByteVC2-capable builds when preparing that codec. Rust uses `nextjson` to parse catalogs, `courierust` and `recurse-x` to validate addresses, `rustbinary` to persist history and `tzcraft` for time calculations.
+`python tool/refresh_catalogs.py` follows episode links on public series pages and reads the MP4 encodings listed or referenced by each episode’s JSON-LD video object. It keeps distinct resolutions with matching durations. SDR HEVC, AV1, VP9 and ByteVC2 encodings can be prepared as AVC playback and download files at their original dimensions. Set `SABLEEN_FFMPEG` and `SABLEEN_FFPROBE` to builds that decode the source codec. Rust uses `nextjson` to parse catalogs, `courierust` and `recurse-x` to validate addresses, `rustbinary` to persist history and `tzcraft` for time calculations.
 
 For Web, build Rust Wasm first, build the Flutter distribution, then run `python tool/stage_web_media.py build/web`. Serve Wasm as `application/wasm`, with `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: credentialless`. [Platform build commands](.github/workflows/stable.yml)
 

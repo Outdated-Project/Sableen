@@ -11,8 +11,12 @@ import 'episode_media.dart';
 import 'src/rust/api/library.dart';
 
 String mediaUrl(Episode episode) {
+  if (episode.url.startsWith('asset:///assets/renditions/')) {
+    return Uri.parse(web.document.baseURI)
+        .resolve('assets/assets/renditions/${episode.sha256}.mp4')
+        .toString();
+  }
   if (episode.sha256 != null &&
-      !episode.url.startsWith('asset:') &&
       web.document.querySelector('meta[name="sableen-offline-worker"]') !=
           null) {
     return Uri.parse(web.document.baseURI)
@@ -262,11 +266,7 @@ class DownloadQueue extends ChangeNotifier {
   ) async {
     final e = job.episode;
     final sources = e.url.startsWith('asset:///assets/renditions/')
-        ? [
-            Uri.parse(web.document.baseURI)
-                .resolve('assets/assets/renditions/${e.sha256}.mp4')
-                .toString(),
-          ]
+        ? [mediaUrl(e)]
         : [key, e.url, ...?e.mirrors];
     for (final url in sources) {
       for (var attempt = 0; attempt < 3; attempt++) {

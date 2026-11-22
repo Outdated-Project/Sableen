@@ -87,6 +87,21 @@ fn catalog_rejects_ambiguous_ids_and_non_https() {
 }
 
 #[test]
+fn catalog_preserves_every_distinct_verified_resolution() {
+    let encodings: Vec<_> = (1..=17)
+        .map(|i| format!(r#"{{"width":{},"height":{},"url":"https://cdn.example.org/{i}.mp4","bytes":123,"sha256":"{i:064x}"}}"#, i * 32, i * 18))
+        .collect();
+    let files = encodings.join(",");
+    let json = format!(
+        r#"{{"version":1,"dramas":[{{"id":"s","title":"S","tags":["A"],"episodes":[{{"id":"e","title":"E","url":"https://cdn.example.org/1.mp4","bytes":123,"sha256":"{:064x}","encodings":[{files}]}}]}}]}}"#,
+        1
+    );
+    let catalog = parse_catalog(json.clone().into_bytes()).unwrap();
+    assert_eq!(catalog[0].episodes[0].encodings.as_ref().unwrap().len(), 17);
+    assert!(parse_catalog(json.replace("\"width\":32,", "\"width\":0,").into_bytes()).is_err());
+}
+
+#[test]
 fn ranking_uses_watched_time_and_half_life() {
     let old = Progress {
         watched_ms: 1000,

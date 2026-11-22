@@ -20,6 +20,8 @@
 
 ## 在剧场里观看
 
+在未登录的桌面 Chrome 中，从《全球死考：刚下刑场你让我去考试一季》的 785 集选集进入第 2 集和第 5 集，两集分别连续解码至 170.53 秒和 101.10 秒，实测尺寸均为 640 × 360。点第 6 集时，网页显示「短剧独家内容，前往App端观看全部内容」。Sableen 当前剧单只收录了这部作品的首集片段。[官方第 2 集](https://hongguoduanju.com/player/7697459724635098174/7697465811157404697)
+
 对照过的开源播放器依赖不同的片源。ShortDrama Player 的开源后端列出完整选集，播放范围取决于官网开放的单集；HongGuoFree 的红果专区使用官方网页播放器。穿山甲的内容输出 SDK 要求应用专属配置，公开接入文档覆盖 Android 和 iOS。目前缺少可供 Sableen 六端播放和离线下载的全季 1080p 内容源。[ShortDrama Player](https://github.com/zuomeizuoyang/shortdrama-player) · [HongGuoFree](https://github.com/dudt/HongGuoFree) · [内容 SDK 接入说明](https://www.csjplatform.com/supportcenter/28549)
 
 | 页面 | 可以做什么 |
@@ -33,9 +35,11 @@
 
 Windows profile 构建在 `1264 × 681` 窗口中滚动浏览 40 部作品。Aero 采集 363 帧，P95 构建和光栅化耗时为 1.98 和 3.98 ms。Liquid 采集 364 帧，对应耗时为 1.82 和 3.72 ms。两次测试的 Flutter 图片缓存峰值均为 2.26 MiB，进程工作集峰值分别为 194.6 和 201.4 MiB。
 
-点剧卡进入全屏，轻点中央暂停或继续，点边缘唤回控件。「选集」按发布方总集数展示集号，可播片段标注实际时长，缺少文件的集号显示「暂无片源」。播放器显示解码尺寸。同一集有多个已核验分辨率时，点尺寸可切换文件并保留进度和暂停状态，离线下载随当前清晰度。原生端还支持同一文件内切换视频轨。手机退出播放器后恢复竖屏，平板和桌面保留窗口方向。可见小窗可继续播放，隐藏应用会暂停。Android 和支持标准画中画的浏览器可进入小窗。
+点剧卡进入全屏，轻点中央暂停或继续，点边缘唤回控件。「选集」列出发布方的全部集号，可播片段标注实际时长。「本应用尚未收录」表示当前剧单没有该集的已核验文件。点播放器的解码尺寸可查看可选分辨率。切换独立文件会保留进度和暂停状态，离线下载使用所选文件。原生端同时列出当前文件内的视频轨。手机退出播放器后恢复竖屏，平板和桌面保留窗口方向。可见小窗可继续播放，隐藏应用会暂停。Android 和支持标准画中画的浏览器可进入小窗。
 
 推荐使用实际观看时长和题材，权重每 21 天减半。拖动和缓冲不增加观看时间。剧单、封面和历史在设备端读取，无需 Sableen 账号。
+
+长剧选集每 15 集一组，点击集号区间即可跳至其他组。播放控制栏可在 0.5× 至 2× 之间切换六档倍速。
 
 ## 保存与续传
 
@@ -76,7 +80,7 @@ flutter test integration_test/playback_test.dart -d windows
 python tool/ci/check_streams.py --require-episodes --report source-measurements.json
 ```
 
-`python tool/refresh_catalogs.py` 按发布方的作品、分集和视频关联更新剧单。可设置 `SABLEEN_FFMPEG` 与 `SABLEEN_FFPROBE` 指向支持 ByteVC2 的构建。Rust 通过 `nextjson` 解析剧单、`courierust` 与 `recurse-x` 校验地址、`rustbinary` 编解码历史、`tzcraft` 计算时间权重。
+`python tool/refresh_catalogs.py` 读取公开详情页的分集链接，并解析该集视频对象直接列出或通过 JSON-LD 引用的 MP4 编码。对于时长匹配的不同尺寸文件，工具保留各档分辨率。SDR HEVC、AV1、VP9 和 ByteVC2 编码可在构建时转换为原尺寸 AVC 供播放和下载。可设置 `SABLEEN_FFMPEG` 与 `SABLEEN_FFPROBE` 指向支持源编码的构建。Rust 通过 `nextjson` 解析剧单、`courierust` 与 `recurse-x` 校验地址、`rustbinary` 编解码历史、`tzcraft` 计算时间权重。
 
 Web 构建先生成 Rust Wasm，再构建 Flutter 并运行 `python tool/stage_web_media.py build/web`。服务器应以 `application/wasm` 提供 Wasm，发送 `Cross-Origin-Opener-Policy: same-origin` 与 `Cross-Origin-Embedder-Policy: credentialless`。[六端构建命令](.github/workflows/stable.yml)
 

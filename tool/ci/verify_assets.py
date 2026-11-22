@@ -16,7 +16,7 @@ def main():
     for category in ('hongguo', 'comic'):
         for title in json.loads(Path(f'assets/catalogs/{category}.json').read_bytes())['dramas']:
             expected.add(f"assets/posters/{category}-{title['episodes'][0]['id']}.webp")
-            catalog_hashes.update(e['sha256'] for e in title['episodes'])
+            catalog_hashes.update(file['sha256'] for e in title['episodes'] for file in [e, *e.get('encodings', [])])
     for source_hash, rendition in json.loads(index.read_bytes()).items():
         f = index.parent / (rendition['sha256'] + '.mp4')
         if source_hash not in catalog_hashes or f.stat().st_size != rendition['bytes']:

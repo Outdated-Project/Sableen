@@ -30,7 +30,7 @@ class VideoQuality extends StatelessWidget {
     final dimensions = width > 0 && height > 0 ? '$width×$height' : null;
     if (dimensions == null && files.isEmpty) return const SizedBox.shrink();
     final tracks = <(int, int), VideoTrack>{};
-    if (!kIsWeb && files.isEmpty) {
+    if (!kIsWeb) {
       for (final track in state.tracks.video) {
         final w = track.w ?? 0, h = track.h ?? 0;
         if (track.image != true && track.albumart != true && w > 0 && h > 0) {
@@ -57,17 +57,22 @@ class VideoQuality extends StatelessWidget {
                     for (final f in files)
                       (
                         size: '${f.width}×${f.height}',
-                        selected: f.sha256 == episode.sha256,
+                        selected: tracks.length > 1 && dimensions != null
+                            ? (f.width, f.height) == (width, height)
+                            : f.sha256 == episode.sha256,
                         file: f,
-                        track: null,
+                        track: f.sha256 == episode.sha256
+                            ? tracks[(f.width, f.height)]
+                            : null,
                       ),
                     for (final entry in tracks.entries)
-                      (
-                        size: '${entry.key.$1}×${entry.key.$2}',
-                        selected: entry.key == (width, height),
-                        file: null,
-                        track: entry.value,
-                      ),
+                      if (!files.any((f) => (f.width, f.height) == entry.key))
+                        (
+                          size: '${entry.key.$1}×${entry.key.$2}',
+                          selected: entry.key == (width, height),
+                          file: null,
+                          track: entry.value,
+                        ),
                   ];
               final result = await showPlayerSheet<int>(
                 context: context,
@@ -80,8 +85,8 @@ class VideoQuality extends StatelessWidget {
                       subtitle: Text(
                         choices.length < 2
                             ? ctx.zh(
-                                '片源仅提供 ${dimensions ?? choices.first.size}',
-                                '片源僅提供 ${dimensions ?? choices.first.size}',
+                                '当前可用 ${dimensions ?? choices.first.size}',
+                                '目前可用 ${dimensions ?? choices.first.size}',
                               )
                             : ctx.zh('选择播放分辨率', '選擇播放解析度'),
                       ),
@@ -105,10 +110,8 @@ class VideoQuality extends StatelessWidget {
                 return;
               }
               final choice = choices[result];
-              if (choice.file case final file?) {
-                selectFile(file);
-              } else if (choice.track case final track?
-                  when player.state.tracks.video.contains(track)) {
+              if (choice.track case final track?) {
+                if (!player.state.tracks.video.contains(track)) return;
                 try {
                   await player.setVideoTrack(track);
                 } catch (_) {
@@ -118,6 +121,8 @@ class VideoQuality extends StatelessWidget {
                     );
                   }
                 }
+              } else if (choice.file case final file?) {
+                selectFile(file);
               }
             },
     );

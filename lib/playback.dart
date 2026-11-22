@@ -9,6 +9,7 @@ import 'package:media_kit_video/media_kit_video.dart';
 
 import 'design.dart';
 import 'episode_media.dart';
+import 'episode_picker.dart';
 import 'library.dart';
 import 'offline.dart';
 import 'player_sheet.dart';
@@ -153,6 +154,10 @@ class _TheaterState extends State<Theater> with WidgetsBindingObserver {
       }),
       player.stream.track.listen((_) {
         _cadence();
+        _update();
+      }),
+      player.stream.rate.listen((_) {
+        _resetEvidence();
         _update();
       }),
       player.stream.completed.listen((done) {
@@ -374,8 +379,11 @@ class _TheaterState extends State<Theater> with WidgetsBindingObserver {
     if (hasBaseline &&
         advancing &&
         delta > 0 &&
-        delta <= now - lastTick + 750) {
-      watched += math.min(delta, math.max(0, now - lastTick));
+        delta <= (now - lastTick) * player.state.rate + 750) {
+      watched += math.min(
+        (delta / player.state.rate).round(),
+        math.max(0, now - lastTick),
+      );
     }
     hasBaseline = advancing;
     previous = ms;
@@ -711,6 +719,21 @@ class _TheaterState extends State<Theater> with WidgetsBindingObserver {
                                                       .titleSmall,
                                                 ),
                                               ),
+                                              Tooltip(
+                                                message: context.zh(
+                                                  '播放倍速',
+                                                  '播放倍速',
+                                                ),
+                                                child: TextButton(
+                                                  onPressed: opening
+                                                      ? null
+                                                      : () =>
+                                                            _selectRate(rotate),
+                                                  child: Text(
+                                                    '${_rateLabel(player.state.rate)}×',
+                                                  ),
+                                                ),
+                                              ),
                                               VideoQuality(
                                                 key: ValueKey(episode.id),
                                                 player: player,
@@ -776,58 +799,48 @@ class _TheaterState extends State<Theater> with WidgetsBindingObserver {
   }
 
   Future<void> _selectEpisode(bool rotated) async {
-    final episodes = widget.drama.episodes;
-    final total = widget.drama.episodeCount;
-    final full = episodes.where((e) => e.isFullLength).length;
-    final previews = episodes.where((e) => e.isPreview).length;
-    final published = widget.drama.publishedIds;
-    final filesById = {for (final (i, e) in episodes.indexed) e.id: i};
     final selected = await showPlayerSheet<int>(
       context: context,
       rotated: rotated,
-      builder: (context) => Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          ListTile(
-            title: Text(widget.drama.title),
-            subtitle: Text(
-              [
-                if (total != null) '全 $total 集',
-                context.zh('正片 $full 集', '正片 $full 集'),
-                if (previews > 0)
-                  context.zh('片段 $previews 个', '片段 $previews 個'),
-              ].join(' · '),
-            ),
-          ),
-          Flexible(
-            child: ListView.builder(
-              shrinkWrap: true,
-              itemCount: published?.length ?? episodes.length,
-              itemBuilder: (context, row) {
-                final number = row + 1;
-                final i = published == null ? row : filesById[published[row]];
-                return ListTile(
-                  enabled: i != null,
-                  selected: i == index,
-                  leading: Icon(
-                    i == null
-                        ? Icons.videocam_off_outlined
-                        : i == index
-                        ? Icons.play_arrow_rounded
-                        : Icons.play_circle_outline,
-                  ),
-                  title: Text(i == null ? '第$number集' : episodes[i].title),
-                  trailing: i == null ? Text(context.zh('暂无片源', '暫無片源')) : null,
-                  onTap: i == null ? null : () => Navigator.pop(context, i),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
+      builder: (_) => EpisodePicker(drama: widget.drama, current: index),
     );
     if (!closed && !opening && selected != null && selected != index) {
       await _open(selected);
+    }
+  }
+
+  String _rateLabel(double rate) =>
+      rate == rate.roundToDouble() ? rate.toStringAsFixed(0) : rate.toString();
+
+  Future<void> _selectRate(bool rotated) async {
+    final rate = await showPlayerSheet<double>(
+      context: context,
+      rotated: rotated,
+      builder: (ctx) => ListView(
+        shrinkWrap: true,
+        children: [
+          ListTile(title: Text(ctx.zh('播放倍速', '播放倍速'))),
+          for (final speed in [0.5, 0.75, 1.0, 1.25, 1.5, 2.0])
+            ListTile(
+              title: Text('${_rateLabel(speed)}×'),
+              selected: speed == player.state.rate,
+              trailing: speed == player.state.rate
+                  ? const Icon(Icons.check_rounded)
+                  : null,
+              onTap: () => Navigator.pop(ctx, speed),
+            ),
+        ],
+      ),
+    );
+    if (closed || rate == null || rate == player.state.rate) return;
+    try {
+      await player.setRate(rate);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(context.zh('倍速切换失败', '倍速切換失敗'))));
+      }
     }
   }
 }

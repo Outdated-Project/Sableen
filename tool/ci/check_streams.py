@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from refresh_catalogs import (HONGGUO, RANKS, ROOT, video_track, fingerprint, listed_ms,
+from refresh_catalogs import (COMPATIBILITY_CODECS, HONGGUO, RANKS, ROOT, video_track, fingerprint, listed_ms,
                               media_snapshot, public_encodings, publication, published_series, published_video)
 
 
@@ -21,6 +21,21 @@ def decode_end(path, duration):
     ], timeout=30, text=True)
     if not any(row.startswith('0,') for row in frames.splitlines()):
         raise ValueError(f'Cannot decode video near {duration} ms in {path.name}')
+
+
+def check_file(path, source_hash):
+    duration, width, height, codec = video_track(path)
+    decode_end(path, duration)
+    if codec in COMPATIBILITY_CODECS:
+        record = json.loads((ROOT.parent / 'renditions/index.json').read_bytes())[source_hash]
+        asset = ROOT.parent / 'renditions' / (record['sha256'] + '.mp4')
+        if fingerprint(asset) != record:
+            raise ValueError(f'Converted media changed for {source_hash}')
+        actual, w, h, tag = video_track(asset)
+        if tag != 'avc1' or abs(duration - actual) > 100 or (width, height) != (w, h):
+            raise ValueError(f'Converted track differs from source for {source_hash}')
+        decode_end(asset, actual)
+    return duration, width, height, codec
 
 
 def check(record):
@@ -46,19 +61,9 @@ def check(record):
     with media_snapshot(media) as path:
         if any(episode.get(key) != value for key, value in fingerprint(path).items()):
             raise ValueError(f'Media bytes changed on {page}')
-        measured, width, height, codec = video_track(path)
-        if codec == 'bvc2':
-            record = json.loads((ROOT.parent / 'renditions/index.json').read_bytes())[episode['sha256']]
-            asset = ROOT.parent / 'renditions' / (record['sha256'] + '.mp4')
-            if fingerprint(asset) != record:
-                raise ValueError(f'Converted media changed on {page}')
-            duration, w, h, tag = video_track(asset)
-            if tag != 'avc1' or abs(measured-duration) > 100 or (width, height) != (w, h):
-                raise ValueError(f'Converted track differs from source on {page}')
-            decode_end(asset, duration)
-        # A plausible header can outlast the decodable video.
-        decode_end(path, measured)
+        measured, width, height, codec = check_file(path, episode['sha256'])
     sizes = set()
+    checked_urls = {media, *episode.get('mirrors', [])}
     for encoding in episode.get('encodings', []):
         url = encoding['url']
         if url not in urls:
@@ -68,31 +73,42 @@ def check(record):
             w, h = width, height
         else:
             with media_snapshot(url) as path:
-                duration, w, h, tag = video_track(path)
-                if (abs(duration - measured) > 250 or tag != 'avc1'
+                fields = fingerprint(path)
+                duration, w, h, tag = check_file(path, fields['sha256'])
+                if (abs(duration - measured) > 250 or (tag != 'avc1' and tag not in COMPATIBILITY_CODECS)
                         or (abs(duration - listed) <= 1000) != (abs(measured - listed) <= 1000)):
                     raise ValueError(f'Non-interchangeable encoding on {page}')
-                decode_end(path, duration)
-                fields = fingerprint(path)
         if (w, h) in sizes or encoding != {'url': url, 'width': w, 'height': h, **fields}:
             raise ValueError(f'Encoding dimensions or bytes changed on {page}')
         sizes.add((w, h))
+        checked_urls.add(url)
     if sizes and (len(sizes) < 2 or media not in {e['url'] for e in episode['encodings']}):
         raise ValueError(f'Invalid default encoding on {page}')
     if abs(measured - episode['durationMs']) > 250 or listed != episode['listedMs']:
         raise ValueError(f'Media duration changed on {page}')
     full = listed > 0 and abs(listed - measured) <= 1000
+    sizes.add((width, height))
+    missing_sizes = set()
+    for url in urls:
+        if url in checked_urls:
+            continue
+        with media_snapshot(url) as path:
+            actual, w, h, _ = video_track(path)
+            if abs(actual - measured) <= 250 and (listed > 0 and abs(actual - listed) <= 1000) == full and (w, h) not in sizes:
+                decode_end(path, actual)
+                missing_sizes.add((w, h))
     expected = f'第{number}集' + ('' if full else f' · {round(measured / 1000)} 秒片段')
     if episode['title'] != expected:
         raise ValueError(f'Incorrect preview label on {page}')
     return {'series_id': series, 'episode_id': item_id, 'episode_number': number, 'measured_ms': measured,
             'listed_ms': listed, 'width': width, 'height': height, 'codec_tag': codec, 'full': full,
-            'full_hd': full and min(width, height) >= 1080 and max(width, height) >= 1920,
+            'full_hd': full and any(min(w, h) >= 1080 and max(w, h) >= 1920 for w, h in sizes),
+            'verified_sizes': sorted(sizes), 'missing_published_sizes': sorted(missing_sizes),
             'bytes': episode['bytes'], 'sha256': episode['sha256']}
 
 
 def complete_series(tracks, count):
-    if len(tracks) != count or not all(track['full_hd'] for track in tracks):
+    if len(tracks) != count or not all(track['full_hd'] and not track['missing_published_sizes'] for track in tracks):
         return False
     return sorted(track['episode_number'] for track in tracks) == list(range(1, count + 1))
 
@@ -139,6 +155,9 @@ def main():
             print(f'{category}: {len(records)} verified, {full} full episodes, {full_hd} at full HD, {complete}/{len(dramas)} complete series', flush=True)
             if complete != len(dramas) or full_hd != len(records):
                 missing.append(category)
+            for track in tracks:
+                if track['missing_published_sizes']:
+                    print(f"Episode {track['episode_id']}: missing published resolutions {track['missing_published_sizes']}")
             if full_hd != len(records):
                 first = next(t for t in tracks if not t['full_hd'])
                 print(f"Episode {first['episode_id']}: decoded {first['width']}x{first['height']}, "
@@ -149,7 +168,7 @@ def main():
         with open(path, 'a', encoding='utf-8') as f:
             f.write('\n'.join(summary) + '\n')
     if args.require_episodes and missing:
-        raise SystemExit('Full-length 1080p coverage incomplete for: ' + ', '.join(missing))
+        raise SystemExit('Full-length 1080p or published resolution coverage incomplete for: ' + ', '.join(missing))
 
 
 if __name__ == '__main__':

@@ -119,10 +119,10 @@ fn valid_encodings(ep: &Episode, files: &[VideoEncoding]) -> bool {
     let mut sizes = HashSet::new();
     let mut hashes = HashSet::new();
     let mut urls = HashSet::new();
-    (2..=16).contains(&files.len())
+    files.len() >= 2
         && files.iter().all(|f| {
-            (1..=16384).contains(&f.width)
-                && (1..=16384).contains(&f.height)
+            f.width > 0
+                && f.height > 0
                 && valid_address(&f.url)
                 && valid_digest(&f.sha256, f.bytes)
                 && sizes.insert((f.width, f.height))

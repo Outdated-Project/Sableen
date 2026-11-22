@@ -6,6 +6,7 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'src/rust/api/library.dart';
+import 'episode_media.dart';
 
 enum Publisher { hongguo, comic }
 
@@ -77,43 +78,7 @@ class Library extends ChangeNotifier {
   }
 
   Drama _withRenditions(Drama drama, Map<String, dynamic> renditions) {
-    if (!drama.episodes.any((e) => renditions.containsKey(e.sha256))) {
-      return drama;
-    }
-    Episode playbackFile(Episode e) {
-      final record = renditions[e.sha256];
-      if (record == null) return e;
-      final hash = record['sha256'] as String;
-      final size = record['bytes'] as int;
-      if (!RegExp(r'^[a-f0-9]{64}$').hasMatch(hash) || size <= 0) {
-        throw const FormatException('Invalid playback rendition');
-      }
-      return Episode(
-        id: e.id,
-        title: e.title,
-        page: e.page,
-        adBreaks: e.adBreaks,
-        durationMs: e.durationMs,
-        listedMs: e.listedMs,
-        encodings: e.encodings
-            ?.map(
-              (file) => file.sha256 != e.sha256
-                  ? file
-                  : VideoEncoding(
-                      width: file.width,
-                      height: file.height,
-                      bytes: size,
-                      sha256: hash,
-                      url: 'asset:///assets/renditions/$hash.mp4',
-                    ),
-            )
-            .toList(growable: false),
-        url: 'asset:///assets/renditions/$hash.mp4',
-        sha256: hash,
-        bytes: size,
-      );
-    }
-
+    if (renditions.isEmpty) return drama;
     return Drama(
       id: drama.id,
       title: drama.title,
@@ -121,7 +86,9 @@ class Library extends ChangeNotifier {
       cover: drama.cover,
       episodeCount: drama.episodeCount,
       publishedIds: drama.publishedIds,
-      episodes: drama.episodes.map(playbackFile).toList(growable: false),
+      episodes: drama.episodes
+          .map((e) => e.withPlaybackRenditions(renditions))
+          .toList(growable: false),
     );
   }
 

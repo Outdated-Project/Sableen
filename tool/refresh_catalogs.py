@@ -16,6 +16,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1] / 'assets' / 'catalogs'
 HONGGUO = 'https://hongguoduanju.com'
 RANKS = {'hongguo': 'hot-real-drama', 'comic': 'hot-comic-drama'}
+COMPATIBILITY_CODECS = {'bvc2': 'bvc2', 'hev1': 'hevc', 'hvc1': 'hevc', 'av01': 'av1', 'vp09': 'vp9'}
 
 
 class Publication(HTMLParser):
@@ -24,6 +25,7 @@ class Publication(HTMLParser):
         self.nodes = []
         self.public_video = {}
         self.series_detail = {}
+        self.player_links = set()
         self.script_type = None
         self.feed(page)
         self.close()
@@ -32,6 +34,12 @@ class Publication(HTMLParser):
         values = dict(attrs)
         if tag == 'script':
             self.script_type = values.get('type', '')
+        elif tag == 'a':
+            link = values.get('href') or ''
+            if link.startswith('/player/'):
+                link = HONGGUO + link
+            if link.startswith(HONGGUO + '/player/'):
+                self.player_links.add(link)
 
     def handle_endtag(self, tag):
         if tag == 'script':
@@ -40,7 +48,9 @@ class Publication(HTMLParser):
     def handle_data(self, data):
         if self.script_type == 'application/ld+json':
             obj = json.loads(data)
-            self.nodes.extend(obj.get('@graph', [obj]))
+            for node in obj if isinstance(obj, list) else [obj]:
+                if isinstance(node, dict):
+                    self.nodes.extend(n for n in node.get('@graph', [node]) if isinstance(n, dict))
         elif self.script_type == '' and data.lstrip().startswith('_ROUTER_DATA = '):
             state, _ = json.JSONDecoder().raw_decode(data.lstrip()[len('_ROUTER_DATA = '):])
             detail = state.get('loaderData', {}).get('detail_page', {}).get('seriesDetail')
@@ -116,15 +126,11 @@ def published_video(doc, series_id, page):
                     and n.get('@id') == page + '#episode' and (
                         n.get('partOfSeason', {}).get('@id') == detail + '#season' or
                         n.get('partOfSeries', {}).get('@id') == detail + '#series')), None)
-    if not episode or not episode.get('video', {}).get('@id'):
+    if not episode or not isinstance(episode.get('video'), dict) or not episode['video'].get('@id'):
         return None
     video = next((n for n in doc.nodes if n.get('@type') == 'VideoObject' and n.get('url') == page
                   and n.get('@id') == episode['video']['@id'] and n.get('about', {}).get('@id') == episode['@id']), None)
-    if not video or not video.get('contentUrl'):
-        return None
-    uri = urlsplit(video['contentUrl'])
-    if (uri.scheme != 'https' or uri.netloc != urlsplit(HONGGUO).netloc or not uri.path.endswith('.mp4')
-            or uri.fragment or uri.query or not video['contentUrl'].isascii() or '\\' in video['contentUrl']):
+    if not video:
         return None
     ids = {match[1]} if match[1] else set()
     public = doc.public_video
@@ -132,24 +138,45 @@ def published_video(doc, series_id, page):
         if public.get('available') is not True or str(public.get('seriesId')) != series_id:
             return None
         ids.add(str(public.get('itemId')))
-    canonical = re.fullmatch(r'/video/public/(\d+)/\d+p\.mp4', uri.path)
-    if canonical:
-        ids.add(canonical[1])
+    primary = video.get('contentUrl')
+    if isinstance(primary, str):
+        canonical = re.fullmatch(re.escape(HONGGUO) + r'/video/public/(\d+)/\d+p\.mp4', primary)
+        if canonical:
+            ids.add(canonical[1])
     if len(ids) != 1 or not re.fullmatch(r'[0-9]+', item_id := ids.pop()):
         return None
-    return item_id, episode['episodeNumber'], video
-
-
-def public_encodings(video, item_id):
-    urls = [video['contentUrl']]
+    # JSON-LD allows a VideoObject to refer to MediaObjects elsewhere in its graph.
     entries = video.get('encoding') or []
+    encodings = []
     for entry in entries if isinstance(entries, list) else [entries]:
         if not isinstance(entry, dict):
             continue
-        url = entry.get('contentUrl')
-        if not isinstance(url, str) or not re.fullmatch(re.escape(HONGGUO) + r'/[\w./%-]+\.mp4', url, flags=re.ASCII):
+        if set(entry) == {'@id'}:
+            matches = [n for n in doc.nodes if n.get('@id') == entry['@id']]
+            if len(matches) != 1:
+                continue
+            entry = matches[0]
+        about = entry.get('about')
+        if about is None or isinstance(about, dict) and about.get('@id') == episode['@id']:
+            encodings.append(entry)
+    video = {**video, 'encoding': encodings}
+    return (item_id, episode['episodeNumber'], video) if public_encodings(video, item_id) else None
+
+
+def public_encodings(video, item_id):
+    urls = []
+    entries = video.get('encoding') or []
+    for entry in [video, *(entries if isinstance(entries, list) else [entries])]:
+        if not isinstance(entry, dict):
             continue
-        canonical = re.fullmatch(r'/video/public/(\d+)/\d+p\.mp4', urlsplit(url).path)
+        url = entry.get('contentUrl')
+        if (not isinstance(url, str) or not url.isascii() or '\\' in url or any(c.isspace() for c in url)
+                or not re.match(r'^https://(?:[a-zA-Z0-9-]+\.)*hongguoduanju\.com/', url)):
+            continue
+        uri = urlsplit(url)
+        if uri.query or uri.fragment or not uri.path.lower().endswith('.mp4'):
+            continue
+        canonical = re.fullmatch(r'/video/public/(\d+)/\d+p\.mp4', uri.path)
         if (not canonical or canonical[1] == item_id) and url not in urls:
             urls.append(url)
     return urls
@@ -165,8 +192,9 @@ def published_series(detail):
     if not match:
         return None
     doc = publication(detail)
-    series = next((n for n in doc.nodes if n.get('url') == detail
-                   and n.get('@type') in ('TVSeries', 'TVSeason') and n.get('episode')), None)
+    seasons = [n for n in doc.nodes if n.get('url') == detail and n.get('@type') in ('TVSeries', 'TVSeason')
+               and type(n.get('numberOfEpisodes')) is int]
+    series = next((n for n in seasons if n.get('episode')), seasons[0] if seasons else None)
     if series is None:
         return None
     metadata = doc.series_detail
@@ -176,7 +204,19 @@ def published_series(detail):
             or not all(isinstance(item, str) and re.fullmatch('[0-9]+', item) for item in ids)
             or len(set(ids)) != len(ids)):
         raise ValueError(f'Invalid published episode list for {detail}')
-    return {**series, 'published_ids': ids}
+    # Only follow player links the publisher actually includes on the detail page.
+    listed = series.get('episode') or []
+    entries = [e for e in (listed if isinstance(listed, list) else [listed])
+               if isinstance(e, dict) and isinstance(e.get('url'), str) and type(e.get('episodeNumber')) is int
+               and e.get('@id') == e['url'] + '#episode']
+    known = {entry['url'] for entry in entries}
+    base = f'{HONGGUO}/player/{match[1]}'
+    numbers = {item: i for i, item in enumerate(ids, start=1)}
+    for link in sorted(doc.player_links - known):
+        player = re.fullmatch(re.escape(base) + r'(?:/([0-9]+))?', link)
+        if player and (number := numbers.get(player[1] or ids[0])):
+            entries.append({'url': link, '@id': link + '#episode', 'episodeNumber': number})
+    return {**series, 'episode': entries, 'published_ids': ids}
 
 
 def quality_files(primary, verified, listed):
@@ -184,15 +224,44 @@ def quality_files(primary, verified, listed):
     _, duration, _, _, _, _ = primary
     sizes = set()
     files = []
-    for candidate in [primary, *verified]:
+    for candidate in [primary, *sorted(verified, key=lambda v: v[5] != 'avc1')]:
         url, actual, width, height, evidence, codec = candidate
         if ((width, height) in sizes or abs(actual - duration) > 250
                 or (listed and (abs(actual - listed) <= 1000) != (abs(duration - listed) <= 1000))
-                or (candidate != primary and codec != 'avc1')):
+                or (candidate != primary and codec != 'avc1' and codec not in COMPATIBILITY_CODECS)):
             continue
         files.append({'width': width, 'height': height, 'url': url, **evidence})
         sizes.add((width, height))
     return files if len(files) > 1 else []
+
+
+def playable_encodings(verified, listed, folder):
+    from transcode_bytevc2 import prepare_rendition
+    candidates = list(verified)
+    converted = {}
+    while candidates:
+        primary = max(candidates, key=lambda v: (
+            bool(listed) and abs(v[1] - listed) <= 1000,
+            min(v[2:4]) >= 1080 and max(v[2:4]) >= 1920, v[2] * v[3], v[5] == 'avc1', v[1]))
+        choices = quality_files(primary, candidates, listed)
+        urls = {primary[0], *(file['url'] for file in choices)}
+        needed = {}
+        for candidate in candidates:
+            url, _, _, _, evidence, tag = candidate
+            if url not in urls or tag not in COMPATIBILITY_CODECS:
+                continue
+            digest = evidence['sha256']
+            try:
+                if digest not in converted:
+                    converted[digest] = prepare_rendition(url, evidence, folder, tag)
+                needed[digest] = converted[digest]
+            except (ValueError, subprocess.SubprocessError, OSError) as error:
+                print(f'Cannot prepare {tag} file {digest}: {error}', flush=True)
+                candidates = [c for c in candidates if c != candidate]
+                break
+        else:
+            return primary, choices, needed
+    raise ValueError('No verified encoding could be prepared for playback')
 
 
 def hongguo_title(item):
@@ -227,11 +296,8 @@ def hongguo_title(item):
                 print(f'Unavailable published media on {page}: {error}', flush=True)
         if not verified:
             raise ValueError(f'No usable published media on {page}')
-        # Prefer a full episode, then the highest measured resolution.
-        primary = max(verified, key=lambda v: (
-            bool(total) and abs(v[1] - total) <= 1000,
-            min(v[2:4]) >= 1080 and max(v[2:4]) >= 1920, v[2] * v[3], v[1]))
-        media, actual, _, _, evidence, codec = primary
+        primary, choices, converted = playable_encodings(verified, total, ROOT.parent / 'renditions')
+        media, actual, _, _, evidence, _ = primary
         mirrors = [url for url, _, _, _, other, _ in verified if url != media and other == evidence][:3]
         label = f'第{number}集'
         if not total or abs(actual - total) > 1000:
@@ -239,11 +305,10 @@ def hongguo_title(item):
         episodes.append({'id': item_id, 'title': label, 'url': media, 'page': page,
                          'durationMs': actual, 'listedMs': total, **evidence,
                          **({'mirrors': mirrors} if mirrors else {})})
-        if choices := quality_files(primary, verified, total):
+        if choices:
             episodes[-1]['encodings'] = choices
-        if codec == 'bvc2':
-            from transcode_bytevc2 import prepare_rendition
-            episodes[-1]['_rendition'] = prepare_rendition(media, evidence, ROOT.parent / 'renditions')
+        if converted:
+            episodes[-1]['_renditions'] = converted
         used.add(item_id)
         tags.extend(video.get('genre') or [])
     if episodes:
@@ -319,8 +384,7 @@ def main():
                 if drama is None:
                     continue
                 for episode in drama['episodes']:
-                    if rendition := episode.pop('_rendition', None):
-                        renditions[episode['sha256']] = rendition
+                    renditions.update(episode.pop('_renditions', {}))
                 titles.append(drama)
                 url = drama.get('cover')
                 if url not in primary:

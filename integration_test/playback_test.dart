@@ -182,14 +182,42 @@ void main() {
       );
       final episode = library.byId[id]!.episodes.first;
       final ids = library.byId[id]!.publishedIds!;
+      await tester.tap(find.byTooltip('播放倍速'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(ListTile, '1.5×'));
+      await until(
+        'Playback rate did not change',
+        () => player().state.rate == 1.5,
+      );
+      expect(player().state.playing, isFalse);
+      await tester.pumpAndSettle();
       await tester.tap(find.byTooltip('选集'));
       await tester.pumpAndSettle();
+      final start = (ids.length - 1) ~/ 15 * 15 + 1;
+      await tester.tap(find.text('1–15'));
+      await tester.pumpAndSettle();
+      final ranges = tester
+          .state<ScrollableState>(
+            find
+                .descendant(
+                  of: find.byType(GridView),
+                  matching: find.byType(Scrollable),
+                )
+                .last,
+          )
+          .position;
+      ranges.jumpTo(ranges.maxScrollExtent);
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.widgetWithText(OutlinedButton, '$start–${ids.length}'),
+      );
+      await tester.pumpAndSettle();
       final list = find
-          .ancestor(
-            of: find.text(episode.title).last,
+          .descendant(
+            of: find.byType(ListView).last,
             matching: find.byType(Scrollable),
           )
-          .first;
+          .last;
       final position = tester.state<ScrollableState>(list).position;
       position.jumpTo(position.maxScrollExtent);
       await tester.pumpAndSettle();
@@ -201,6 +229,12 @@ void main() {
         last?.title ?? '第${ids.length}集',
       );
       expect(tester.widget<ListTile>(lastTile).enabled, last != null);
+      if (last == null) {
+        expect(
+          find.descendant(of: lastTile, matching: find.text('本应用尚未收录')),
+          findsOneWidget,
+        );
+      }
       Navigator.of(tester.element(lastTile)).pop();
       await tester.pumpAndSettle();
       final hadCopy = await offlinePath(episode) != null;
